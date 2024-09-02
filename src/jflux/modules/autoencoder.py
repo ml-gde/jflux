@@ -1,11 +1,8 @@
 from dataclasses import dataclass
 
-import jax
-from jax import Array
-from jax import numpy as jnp
+import torch
 from einops import rearrange
-from flax.experimental import nnx
-from flax.experimental.nnx import swish
+from torch import Tensor, nn
 
 
 @dataclass
@@ -21,21 +18,25 @@ class AutoEncoderParams:
     shift_factor: float
 
 
-class AttnBlock(nnx.Module):
-    def __init__(self, in_channels: int, rngs=nnx.Rngs):
+def swish(x: Tensor) -> Tensor:
+    return x * torch.sigmoid(x)
+
+
+class AttnBlock(nn.Module):
+    def __init__(self, in_channels: int):
         super().__init__()
         self.in_channels = in_channels
 
-        self.norm = nnx.GroupNorm(
-            num_groups=32, num_features=in_channels, epsilon=1e-6, affine=True
+        self.norm = nn.GroupNorm(
+            num_groups=32, num_channels=in_channels, eps=1e-6, affine=True
         )
 
-        self.q = nnx.Conv(in_channels, in_channels, kernel_size=1)
-        self.k = nnx.Conv(in_channels, in_channels, kernel_size=1)
-        self.v = nnx.Conv(in_channels, in_channels, kernel_size=1)
-        self.proj_out = nnx.Conv(in_channels, in_channels, kernel_size=1)
+        self.q = nn.Conv2d(in_channels, in_channels, kernel_size=1)
+        self.k = nn.Conv2d(in_channels, in_channels, kernel_size=1)
+        self.v = nn.Conv2d(in_channels, in_channels, kernel_size=1)
+        self.proj_out = nn.Conv2d(in_channels, in_channels, kernel_size=1)
 
-    def attention(self, h_: Array) -> Array:
+    def attention(self, h_: Tensor) -> Tensor:
         h_ = self.norm(h_)
         q = self.q(h_)
         k = self.k(h_)
@@ -45,35 +46,35 @@ class AttnBlock(nnx.Module):
         q = rearrange(q, "b c h w -> b 1 (h w) c").contiguous()
         k = rearrange(k, "b c h w -> b 1 (h w) c").contiguous()
         v = rearrange(v, "b c h w -> b 1 (h w) c").contiguous()
-        h_ = nnx.functional.scaled_dot_product_attention(q, k, v)
+        h_ = nn.functional.scaled_dot_product_attention(q, k, v)
 
         return rearrange(h_, "b 1 (h w) c -> b c h w", h=h, w=w, c=c, b=b)
 
-    def forward(self, x: Array) -> Array:
+    def forward(self, x: Tensor) -> Tensor:
         return x + self.proj_out(self.attention(x))
 
 
-class ResnetBlock(nnx.Module):
-    def __init__(self, in_channels: int, out_channels: int, rngs=nnx.Rngs):
+class ResnetBlock(nn.Module):
+    def __init__(self, in_channels: int, out_channels: int):
         super().__init__()
         self.in_channels = in_channels
         out_channels = in_channels if out_channels is None else out_channels
         self.out_channels = out_channels
 
-        self.norm1 = nnx.GroupNorm(
-            num_groups=32, num_features=in_channels, epsilon=1e-6, affine=True
+        self.norm1 = nn.GroupNorm(
+            num_groups=32, num_channels=in_channels, eps=1e-6, affine=True
         )
-        self.conv1 = nnx.Conv(
+        self.conv1 = nn.Conv2d(
             in_channels, out_channels, kernel_size=3, stride=1, padding=1
         )
-        self.norm2 = nnx.GroupNorm(
+        self.norm2 = nn.GroupNorm(
             num_groups=32, num_channels=out_channels, eps=1e-6, affine=True
         )
-        self.conv2 = nnx.Conv(
+        self.conv2 = nn.Conv2d(
             out_channels, out_channels, kernel_size=3, stride=1, padding=1
         )
         if self.in_channels != self.out_channels:
-            self.nin_shortcut = nnx.Conv(
+            self.nin_shortcut = nn.Conv2d(
                 in_channels, out_channels, kernel_size=1, stride=1, padding=0
             )
 
@@ -93,31 +94,35 @@ class ResnetBlock(nnx.Module):
         return x + h
 
 
-class Downsample(nnx.Module):
-    def __init__(self, in_channels: int, rngs=nnx.Rngs):
+class Downsample(nn.Module):
+    def __init__(self, in_channels: int):
         super().__init__()
         # no asymmetric padding in torch conv, must do it ourselves
-        self.conv = nnx.Conv(in_channels, in_channels, kernel_size=3, stride=2, padding=0)
+        self.conv = nn.Conv2d(
+            in_channels, in_channels, kernel_size=3, stride=2, padding=0
+        )
 
-    def forward(self, x: Array):
+    def forward(self, x: Tensor):
         pad = (0, 1, 0, 1)
-        x = jnp.pad(x, pad, mode="constant", value=0)
+        x = nn.functional.pad(x, pad, mode="constant", value=0)
         x = self.conv(x)
         return x
 
 
-class Upsample(nnx.Module):
-    def __init__(self, in_channels: int, rngs=nnx.Rngs):
+class Upsample(nn.Module):
+    def __init__(self, in_channels: int):
         super().__init__()
-        self.conv = nnx.Conv(in_channels, in_channels, kernel_size=3, stride=1, padding=1)
+        self.conv = nn.Conv2d(
+            in_channels, in_channels, kernel_size=3, stride=1, padding=1
+        )
 
-    def forward(self, x: Array):
-        x = jnp.interp(x, scale_factor=2.0, mode="nearest")
+    def forward(self, x: Tensor):
+        x = nn.functional.interpolate(x, scale_factor=2.0, mode="nearest")
         x = self.conv(x)
         return x
 
 
-class Encoder(nnx.Module):
+class Encoder(nn.Module):
     def __init__(
         self,
         resolution: int,
@@ -126,7 +131,6 @@ class Encoder(nnx.Module):
         ch_mult: list[int],
         num_res_blocks: int,
         z_channels: int,
-        rngs=nnx.Rngs,
     ):
         super().__init__()
         self.ch = ch
@@ -135,22 +139,22 @@ class Encoder(nnx.Module):
         self.resolution = resolution
         self.in_channels = in_channels
         # downsampling
-        self.conv_in = nnx.Conv(in_channels, self.ch, kernel_size=3, stride=1, padding=1)
+        self.conv_in = nn.Conv2d(in_channels, self.ch, kernel_size=3, stride=1, padding=1)
 
         curr_res = resolution
         in_ch_mult = (1,) + tuple(ch_mult)
         self.in_ch_mult = in_ch_mult
-        self.down = []
+        self.down = nn.ModuleList()
         block_in = self.ch
         for i_level in range(self.num_resolutions):
-            block = []
-            attn = []
+            block = nn.ModuleList()
+            attn = nn.ModuleList()
             block_in = ch * in_ch_mult[i_level]
             block_out = ch * ch_mult[i_level]
             for _ in range(self.num_res_blocks):
                 block.append(ResnetBlock(in_channels=block_in, out_channels=block_out))
                 block_in = block_out
-            down = nnx.Module()
+            down = nn.Module()
             down.block = block
             down.attn = attn
             if i_level != self.num_resolutions - 1:
@@ -159,20 +163,20 @@ class Encoder(nnx.Module):
             self.down.append(down)
 
         # middle
-        self.mid = nnx.Module()
+        self.mid = nn.Module()
         self.mid.block_1 = ResnetBlock(in_channels=block_in, out_channels=block_in)
         self.mid.attn_1 = AttnBlock(block_in)
         self.mid.block_2 = ResnetBlock(in_channels=block_in, out_channels=block_in)
 
         # end
-        self.norm_out = nnx.GroupNorm(
-            num_groups=32, num_features=block_in, epsilon=1e-6, affine=True
+        self.norm_out = nn.GroupNorm(
+            num_groups=32, num_channels=block_in, eps=1e-6, affine=True
         )
-        self.conv_out = nnx.Conv(
+        self.conv_out = nn.Conv2d(
             block_in, 2 * z_channels, kernel_size=3, stride=1, padding=1
         )
 
-    def forward(self, x: Array) -> Array:
+    def forward(self, x: Tensor) -> Tensor:
         # downsampling
         hs = [self.conv_in(x)]
         for i_level in range(self.num_resolutions):
@@ -196,7 +200,7 @@ class Encoder(nnx.Module):
         return h
 
 
-class Decoder(nnx.Module):
+class Decoder(nn.Module):
     def __init__(
         self,
         ch: int,
@@ -206,7 +210,6 @@ class Decoder(nnx.Module):
         in_channels: int,
         resolution: int,
         z_channels: int,
-        rngs=nnx.Rngs,
     ):
         super().__init__()
         self.ch = ch
@@ -222,24 +225,24 @@ class Decoder(nnx.Module):
         self.z_shape = (1, z_channels, curr_res, curr_res)
 
         # z to block_in
-        self.conv_in = nnx.Conv(z_channels, block_in, kernel_size=3, stride=1, padding=1)
+        self.conv_in = nn.Conv2d(z_channels, block_in, kernel_size=3, stride=1, padding=1)
 
         # middle
-        self.mid = nnx.Module()
+        self.mid = nn.Module()
         self.mid.block_1 = ResnetBlock(in_channels=block_in, out_channels=block_in)
         self.mid.attn_1 = AttnBlock(block_in)
         self.mid.block_2 = ResnetBlock(in_channels=block_in, out_channels=block_in)
 
         # upsampling
-        self.up = []
+        self.up = nn.ModuleList()
         for i_level in reversed(range(self.num_resolutions)):
-            block = []
-            attn = []
+            block = nn.ModuleList()
+            attn = nn.ModuleList()
             block_out = ch * ch_mult[i_level]
             for _ in range(self.num_res_blocks + 1):
                 block.append(ResnetBlock(in_channels=block_in, out_channels=block_out))
                 block_in = block_out
-            up = nnx.Module()
+            up = nn.Module()
             up.block = block
             up.attn = attn
             if i_level != 0:
@@ -248,12 +251,12 @@ class Decoder(nnx.Module):
             self.up.insert(0, up)  # prepend to get consistent order
 
         # end
-        self.norm_out = nnx.GroupNorm(
+        self.norm_out = nn.GroupNorm(
             num_groups=32, num_channels=block_in, eps=1e-6, affine=True
         )
-        self.conv_out = nnx.Conv(block_in, out_ch, kernel_size=3, stride=1, padding=1)
+        self.conv_out = nn.Conv2d(block_in, out_ch, kernel_size=3, stride=1, padding=1)
 
-    def forward(self, z: Array) -> Array:
+    def forward(self, z: Tensor) -> Tensor:
         # z to block_in
         h = self.conv_in(z)
 
@@ -278,23 +281,23 @@ class Decoder(nnx.Module):
         return h
 
 
-class DiagonalGaussian(nnx.Module):
-    def __init__(self, sample: bool = True, chunk_dim: int = 1, rngs=nnx.Rngs):
+class DiagonalGaussian(nn.Module):
+    def __init__(self, sample: bool = True, chunk_dim: int = 1):
         super().__init__()
         self.sample = sample
         self.chunk_dim = chunk_dim
 
-    def forward(self, z: Array) -> Array:
-        mean, logvar = jnp.split(z, 2, dim=self.chunk_dim)
+    def forward(self, z: Tensor) -> Tensor:
+        mean, logvar = torch.chunk(z, 2, dim=self.chunk_dim)
         if self.sample:
-            std = jnp.exp(0.5 * logvar)
-            return mean + std * jax.random.normal(shape=mean.shape)
+            std = torch.exp(0.5 * logvar)
+            return mean + std * torch.randn_like(mean)
         else:
             return mean
 
 
-class AutoEncoder(nnx.Module):
-    def __init__(self, params: AutoEncoderParams, rngs=nnx.Rngs):
+class AutoEncoder(nn.Module):
+    def __init__(self, params: AutoEncoderParams):
         super().__init__()
         self.encoder = Encoder(
             resolution=params.resolution,
@@ -318,14 +321,14 @@ class AutoEncoder(nnx.Module):
         self.scale_factor = params.scale_factor
         self.shift_factor = params.shift_factor
 
-    def encode(self, x: Array) -> Array:
+    def encode(self, x: Tensor) -> Tensor:
         z = self.reg(self.encoder(x))
         z = self.scale_factor * (z - self.shift_factor)
         return z
 
-    def decode(self, z: Array) -> Array:
+    def decode(self, z: Tensor) -> Tensor:
         z = z / self.scale_factor + self.shift_factor
         return self.decoder(z)
 
-    def forward(self, x: Array) -> Array:
+    def forward(self, x: Tensor) -> Tensor:
         return self.decode(self.encode(x))

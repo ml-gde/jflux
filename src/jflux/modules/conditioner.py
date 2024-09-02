@@ -1,9 +1,8 @@
-from jax import Array
-from flax import nnx
-from transformers import FlaxCLIPTextModel, CLIPTokenizer, FlaxT5EncoderModel, T5Tokenizer
+from torch import Tensor, nn
+from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 
 
-class HFEmbedder(nnx.Module):
+class HFEmbedder(nn.Module):
     def __init__(self, version: str, max_length: int, **hf_kwargs):
         super().__init__()
         self.is_clip = version.startswith("openai")
@@ -14,20 +13,20 @@ class HFEmbedder(nnx.Module):
             self.tokenizer: CLIPTokenizer = CLIPTokenizer.from_pretrained(
                 version, max_length=max_length
             )
-            self.hf_module: FlaxCLIPTextModel = FlaxCLIPTextModel.from_pretrained(
+            self.hf_module: CLIPTextModel = CLIPTextModel.from_pretrained(
                 version, **hf_kwargs
             )
         else:
             self.tokenizer: T5Tokenizer = T5Tokenizer.from_pretrained(
                 version, max_length=max_length
             )
-            self.hf_module: FlaxT5EncoderModel = FlaxT5EncoderModel.from_pretrained(
+            self.hf_module: T5EncoderModel = T5EncoderModel.from_pretrained(
                 version, **hf_kwargs
             )
 
         self.hf_module = self.hf_module.eval().requires_grad_(False)
 
-    def forward(self, text: list[str]) -> Array:
+    def forward(self, text: list[str]) -> Tensor:
         batch_encoding = self.tokenizer(
             text,
             truncation=True,

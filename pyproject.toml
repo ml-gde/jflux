@@ -1,3 +1,21 @@
+[project]
+name = "jflux"
+authors = [
+  { name = "Saurav and Aritra"},
+]
+description = "Inference codebase for JAX-FLUX"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE.md" }
+dynamic = ["version"]
+
+[project.scripts]
+jflux = "jflux.cli:app"
+
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools>=64", "wheel", "setuptools_scm>=8"]
+
 [tool.ruff]
 line-length = 90
 
