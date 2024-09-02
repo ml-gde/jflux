@@ -1,0 +1,52 @@
+name: "Build and Tests"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**.py"
+      - ".devcontainer/requirements.txt"
+      - ".github/workflows/python.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "**.py"
+      - ".devcontainer/requirements.txt"
+      - ".github/workflows/python.yml"
+  release:
+    types: [created]
+  schedule:
+    - cron: "0 0 * * 0"
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+          cache-dependency-path: ".devcontainer/requirements.txt"
+
+      - name: Install dependencies
+        run: |
+          python -m venv .venv && export PATH=".venv/bin:$PATH"
+          python -m pip install uv
+          python -m uv pip install --upgrade wheel setuptools
+          python -m uv pip install -r .devcontainer/requirements.txt
+      - name: Ruff
+        run: |
+          python -m venv .venv && export PATH=".venv/bin:$PATH"
+          python -m ruff check src
+      - name: Test with PyTest
+        run: |
+          python -m venv .venv && export PATH=".venv/bin:$PATH"
+          python -m pytest -v .
