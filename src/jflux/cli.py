@@ -13,7 +13,6 @@ from flax import nnx
 from jflux.sampling import denoise, get_noise, get_schedule, prepare, unpack
 from jflux.util import (
     configs,
-    embed_watermark,
     load_ae,
     load_clip,
     load_flow_model,

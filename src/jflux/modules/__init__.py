@@ -59,7 +59,7 @@ class MLPEmbedder(nnx.Module):
         return self.out_layer(self.silu(self.in_layer(x)))
 
 
-class RMSNorm(jnp.nnx.Module):
+class RMSNorm(nnx.Module):
     def __init__(self, dim: int):
         super().__init__()
         self.scale = nnx.Param(jnp.ones(dim))
@@ -71,7 +71,7 @@ class RMSNorm(jnp.nnx.Module):
         return (x * rrms).to(dtype=x_dtype) * self.scale
 
 
-class QKNorm(jnp.nnx.Module):
+class QKNorm(nnx.Module):
     def __init__(self, dim: int):
         super().__init__()
         self.query_norm = RMSNorm(dim)

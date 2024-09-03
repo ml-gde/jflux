@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass
 
-import torch
+from jax import numpy as jnp
 from einops import rearrange
 from huggingface_hub import hf_hub_download
 from safetensors.torch import load_file as load_sft
@@ -102,7 +102,7 @@ def print_load_warning(missing: list[str], unexpected: list[str]) -> None:
 
 
 def load_flow_model(
-    name: str, device: str | torch.device = "cuda", hf_download: bool = True
+    name: str, device: str | jnp.device = "cuda", hf_download: bool = True
 ):
     # Loading Flux
     print("Init model")
@@ -115,8 +115,8 @@ def load_flow_model(
     ):
         ckpt_path = hf_hub_download(configs[name].repo_id, configs[name].repo_flow)
 
-    with torch.device("meta" if ckpt_path is not None else device):
-        model = Flux(configs[name].params).to(torch.bfloat16)
+    with jnp.device("meta" if ckpt_path is not None else device):
+        model = Flux(configs[name].params).to(jnp.bfloat16)
 
     if ckpt_path is not None:
         print("Loading checkpoint")
@@ -127,21 +127,21 @@ def load_flow_model(
     return model
 
 
-def load_t5(device: str | torch.device = "cuda", max_length: int = 512) -> HFEmbedder:
+def load_t5(device: str | jnp.device = "cuda", max_length: int = 512) -> HFEmbedder:
     # max length 64, 128, 256 and 512 should work (if your sequence is short enough)
     return HFEmbedder(
-        "google/t5-v1_1-xxl", max_length=max_length, torch_dtype=torch.bfloat16
+        "google/t5-v1_1-xxl", max_length=max_length, dtype=jnp.bfloat16
     ).to(device)
 
 
-def load_clip(device: str | torch.device = "cuda") -> HFEmbedder:
+def load_clip(device: str | jnp.device = "cuda") -> HFEmbedder:
     return HFEmbedder(
-        "openai/clip-vit-large-patch14", max_length=77, torch_dtype=torch.bfloat16
+        "openai/clip-vit-large-patch14", max_length=77, torch_dtype=jnp.bfloat16
     ).to(device)
 
 
 def load_ae(
-    name: str, device: str | torch.device = "cuda", hf_download: bool = True
+    name: str, device: str | jnp.device = "cuda", hf_download: bool = True
 ) -> AutoEncoder:
     ckpt_path = configs[name].ae_path
     if (
@@ -154,7 +154,7 @@ def load_ae(
 
     # Loading the autoencoder
     print("Init AE")
-    with torch.device("meta" if ckpt_path is not None else device):
+    with jnp.device("meta" if ckpt_path is not None else device):
         ae = AutoEncoder(configs[name].ae_params)
 
     if ckpt_path is not None:
