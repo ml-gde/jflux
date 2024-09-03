@@ -19,7 +19,6 @@ from jflux.util import (
     load_flow_model,
     load_t5,
 )
-from transformers import pipeline
 
 NSFW_THRESHOLD = 0.85
 
