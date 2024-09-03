@@ -14,7 +14,7 @@ class EmbedND(nnx.Module):
         self.theta = theta
         self.axes_dim = axes_dim
 
-    def forward(self, ids: Array) -> Array:
+    def __call__(self, ids: Array) -> Array:
         n_axes = ids.shape[-1]
         emb = jnp.cat(
             [rope(ids[..., i], self.axes_dim[i], self.theta) for i in range(n_axes)],
@@ -40,9 +40,9 @@ def timestep_embedding(t: Array, dim, max_period=10000, time_factor: float = 100
     ).to(t.device)
 
     args = t[:, None].float() * freqs[None]
-    embedding = jnp.cat([jnp.cos(args), jnp.sin(args)], dim=-1)
+    embedding = jnp.concat([jnp.cos(args), jnp.sin(args)], axis=-1)
     if dim % 2:
-        embedding = jnp.cat([embedding, jnp.zeros_like(embedding[:, :1])], dim=-1)
+        embedding = jnp.concat([embedding, jnp.zeros_like(embedding[:, :1])], axis=-1)
     if jnp.is_floating_point(t):
         embedding = embedding.to(t)
     return embedding
@@ -52,38 +52,38 @@ class MLPEmbedder(nnx.Module):
     def __init__(self, in_dim: int, hidden_dim: int):
         super().__init__()
         self.in_layer = nnx.Linear(in_dim, hidden_dim, bias=True)
-        self.silu = nnx.SiLU()
+        self.silu = nnx.silu
         self.out_layer = nnx.Linear(hidden_dim, hidden_dim, bias=True)
 
-    def forward(self, x: Array) -> Array:
+    def __call__(self, x: Array) -> Array:
         return self.out_layer(self.silu(self.in_layer(x)))
 
 
-class RMSNorm(jnp.nn.Module):
+class RMSNorm(jnp.nnx.Module):
     def __init__(self, dim: int):
         super().__init__()
-        self.scale = nnx.Parameter(jnp.ones(dim))
+        self.scale = nnx.Param(jnp.ones(dim))
 
-    def forward(self, x: Array):
+    def __call__(self, x: Array):
         x_dtype = x.dtype
-        x = x.float()
+        x = x.astype(jnp.float32)
         rrms = jnp.rsqrt(jnp.mean(x**2, dim=-1, keepdim=True) + 1e-6)
         return (x * rrms).to(dtype=x_dtype) * self.scale
 
 
-class QKNorm(jnp.nn.Module):
+class QKNorm(jnp.nnx.Module):
     def __init__(self, dim: int):
         super().__init__()
         self.query_norm = RMSNorm(dim)
         self.key_norm = RMSNorm(dim)
 
-    def forward(self, q: Array, k: Array, v: Array) -> tuple[Array, Array]:
+    def __call__(self, q: Array, k: Array, v: Array) -> tuple[Array, Array]:
         q = self.query_norm(q)
         k = self.key_norm(k)
         return q.to(v), k.to(v)
 
 
-class SelfAttention(nn.Module):
+class SelfAttention(nnx.Module):
     def __init__(self, dim: int, num_heads: int = 8, qkv_bias: bool = False):
         super().__init__()
         self.num_heads = num_heads
@@ -93,7 +93,7 @@ class SelfAttention(nn.Module):
         self.norm = QKNorm(head_dim)
         self.proj = nnx.Linear(dim, dim)
 
-    def forward(self, x: Array, pe: Array) -> Array:
+    def __call__(self, x: Array, pe: Array) -> Array:
         qkv = self.qkv(x)
         q, k, v = rearrange(qkv, "B L (K H D) -> K B H L D", K=3, H=self.num_heads)
         q, k = self.norm(q, k, v)
@@ -116,7 +116,7 @@ class Modulation(nnx.Module):
         self.multiplier = 6 if double else 3
         self.lin = nnx.Linear(dim, self.multiplier * dim, bias=True)
 
-    def forward(self, vec: Array) -> tuple[ModulationOut, ModulationOut | None]:
+    def __call__(self, vec: Array) -> tuple[ModulationOut, ModulationOut | None]:
         out = self.lin(nnx.functional.silu(vec))[:, None, :].chunk(
             self.multiplier, dim=-1
         )
@@ -127,7 +127,7 @@ class Modulation(nnx.Module):
         )
 
 
-class DoubleStreamBlock(nn.Module):
+class DoubleStreamBlock(nnx.Module):
     def __init__(
         self, hidden_size: int, num_heads: int, mlp_ratio: float, qkv_bias: bool = False
     ):
@@ -162,7 +162,7 @@ class DoubleStreamBlock(nn.Module):
             nnx.Linear(mlp_hidden_dim, hidden_size, bias=True),
         )
 
-    def forward(
+    def __call__(
         self, img: Array, txt: Array, vec: Array, pe: Array
     ) -> tuple[Array, Array]:
         img_mod1, img_mod2 = self.img_mod(vec)
@@ -241,7 +241,7 @@ class SingleStreamBlock(nnx.Module):
         self.mlp_act = nnx.GELU(approximate="tanh")
         self.modulation = Modulation(hidden_size, double=False)
 
-    def forward(self, x: Array, vec: Array, pe: Array) -> Array:
+    def __call__(self, x: Array, vec: Array, pe: Array) -> Array:
         mod, _ = self.modulation(vec)
         x_mod = (1 + mod.scale) * self.pre_norm(x) + mod.shift
         qkv, mlp = jnp.split(
@@ -258,7 +258,7 @@ class SingleStreamBlock(nnx.Module):
         return x + mod.gate * output
 
 
-class LastLayer(nn.Module):
+class LastLayer(nnx.Module):
     def __init__(self, hidden_size: int, patch_size: int, out_channels: int):
         super().__init__()
         self.norm_final = nnx.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
@@ -269,7 +269,7 @@ class LastLayer(nn.Module):
             nnx.SiLU(), nnx.Linear(hidden_size, 2 * hidden_size, bias=True)
         )
 
-    def forward(self, x: Array, vec: Array) -> Array:
+    def __call__(self, x: Array, vec: Array) -> Array:
         shift, scale = self.adaLN_modulation(vec).chunk(2, dim=1)
         x = (1 + scale[:, None, :]) * self.norm_final(x) + shift[:, None, :]
         x = self.linear(x)
