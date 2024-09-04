@@ -1,39 +1,22 @@
 [project]
-name = "jflux"
-authors = [
-  { name = "Saurav and Aritra"},
-]
-description = "Inference codebase for JAX-FLUX"
+name = "flux-jax"
+version = "0.1.0"
+description = "Inference codebase for Flux in Jax"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE.md" }
-dynamic = ["version"]
+dependencies = [
+    "einops>=0.8.0",
+    "fire>=0.6.0",
+    "flax>=0.9.0",
+    "flux-jax",
+    "jax[cuda12]>=0.4.31",
+    "pillow>=10.4.0",
+    "transformers>=4.44.2",
+]
 
 [project.scripts]
 jflux = "jflux.cli:app"
 
-[build-system]
-build-backend = "setuptools.build_meta"
-requires = ["setuptools>=64", "wheel", "setuptools_scm>=8"]
-
-[tool.ruff]
-line-length = 90
-
-[tool.ruff.lint]
-select = ["E", "F"]
-
-[tool.ruff.lint.isort]
-lines-after-imports = 2
-
-[tool.black]
-line-length = 88
-
-[[tool.mypy.overrides]]
-ignore_missing_imports = true
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-filterwarnings = [
-    "ignore::DeprecationWarning",
-	"ignore::UserWarning"
-]
+[tool.uv.sources]
+flux-jax = { workspace = true }

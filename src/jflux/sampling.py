@@ -1,23 +1,23 @@
 import math
 from typing import Callable
 
-import torch
 from einops import rearrange, repeat
-from torch import Tensor
 
-from .model import Flux
-from .modules.conditioner import HFEmbedder
+from jax import numpy as jnp
+from jax import Array
+from jflux.model import Flux
+from jflux.modules.conditioner import HFEmbedder
 
 
 def get_noise(
     num_samples: int,
     height: int,
     width: int,
-    device: torch.device,
-    dtype: torch.dtype,
+    device,
+    dtype,
     seed: int,
 ):
-    return torch.randn(
+    return jnp.randn(
         num_samples,
         16,
         # allow for packing
@@ -25,13 +25,13 @@ def get_noise(
         2 * math.ceil(width / 16),
         device=device,
         dtype=dtype,
-        generator=torch.Generator(device=device).manual_seed(seed),
+        generator=jnp.Generator(device=device).manual_seed(seed),
     )
 
 
 def prepare(
-    t5: HFEmbedder, clip: HFEmbedder, img: Tensor, prompt: str | list[str]
-) -> dict[str, Tensor]:
+    t5: HFEmbedder, clip: HFEmbedder, img: Array, prompt: str | list[str]
+) -> dict[str, Array]:
     bs, c, h, w = img.shape
     if bs == 1 and not isinstance(prompt, str):
         bs = len(prompt)
@@ -40,9 +40,9 @@ def prepare(
     if img.shape[0] == 1 and bs > 1:
         img = repeat(img, "1 ... -> bs ...", bs=bs)
 
-    img_ids = torch.zeros(h // 2, w // 2, 3)
-    img_ids[..., 1] = img_ids[..., 1] + torch.arange(h // 2)[:, None]
-    img_ids[..., 2] = img_ids[..., 2] + torch.arange(w // 2)[None, :]
+    img_ids = jnp.zeros(h // 2, w // 2, 3)
+    img_ids[..., 1] = img_ids[..., 1] + jnp.arange(h // 2)[:, None]
+    img_ids[..., 2] = img_ids[..., 2] + jnp.arange(w // 2)[None, :]
     img_ids = repeat(img_ids, "h w c -> b (h w) c", b=bs)
 
     if isinstance(prompt, str):
@@ -50,7 +50,7 @@ def prepare(
     txt = t5(prompt)
     if txt.shape[0] == 1 and bs > 1:
         txt = repeat(txt, "1 ... -> bs ...", bs=bs)
-    txt_ids = torch.zeros(bs, txt.shape[1], 3)
+    txt_ids = jnp.zeros(bs, txt.shape[1], 3)
 
     vec = clip(prompt)
     if vec.shape[0] == 1 and bs > 1:
@@ -65,7 +65,7 @@ def prepare(
     }
 
 
-def time_shift(mu: float, sigma: float, t: Tensor):
+def time_shift(mu: float, sigma: float, t: Array):
     return math.exp(mu) / (math.exp(mu) + (1 / t - 1) ** sigma)
 
 
@@ -85,7 +85,7 @@ def get_schedule(
     shift: bool = True,
 ) -> list[float]:
     # extra step for zero
-    timesteps = torch.linspace(1, 0, num_steps + 1)
+    timesteps = jnp.linspace(1, 0, num_steps + 1)
 
     # shifting the schedule to favor high timesteps for higher signal images
     if shift:
@@ -99,21 +99,21 @@ def get_schedule(
 def denoise(
     model: Flux,
     # model input
-    img: Tensor,
-    img_ids: Tensor,
-    txt: Tensor,
-    txt_ids: Tensor,
-    vec: Tensor,
+    img: Array,
+    img_ids: Array,
+    txt: Array,
+    txt_ids: Array,
+    vec: Array,
     # sampling parameters
     timesteps: list[float],
     guidance: float = 4.0,
 ):
     # this is ignored for schnell
-    guidance_vec = torch.full(
+    guidance_vec = jnp.full(
         (img.shape[0],), guidance, device=img.device, dtype=img.dtype
     )
     for t_curr, t_prev in zip(timesteps[:-1], timesteps[1:]):
-        t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
+        t_vec = jnp.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
         pred = model(
             img=img,
             img_ids=img_ids,
@@ -129,7 +129,7 @@ def denoise(
     return img
 
 
-def unpack(x: Tensor, height: int, width: int) -> Tensor:
+def unpack(x: Array, height: int, width: int) -> Array:
     return rearrange(
         x,
         "b (h w) (c ph pw) -> b c (h ph) (w pw)",

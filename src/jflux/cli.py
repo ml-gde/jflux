@@ -103,6 +103,7 @@ def main(
             idx = 0
 
     # init all components
+    import sys; sys.exit(0)
     t5 = load_t5(jax_device, max_length=256 if name == "flux-schnell" else 512)
     clip = load_clip(jax_device)
     model = load_flow_model(name, device="cpu" if offload else jax_device)

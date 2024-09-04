@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from jax import numpy as jnp
 from einops import rearrange
 from huggingface_hub import hf_hub_download
-from safetensors.torch import load_file as load_sft
+from safetensors.numpy import load_file as load_sft
 
 from jflux.model import Flux, FluxParams
 from jflux.modules.autoencoder import AutoEncoder, AutoEncoderParams
@@ -102,7 +102,7 @@ def print_load_warning(missing: list[str], unexpected: list[str]) -> None:
 
 
 def load_flow_model(
-    name: str, device: str | jnp.device = "cuda", hf_download: bool = True
+    name: str, device = "cuda", hf_download: bool = True
 ):
     # Loading Flux
     print("Init model")
@@ -127,21 +127,21 @@ def load_flow_model(
     return model
 
 
-def load_t5(device: str | jnp.device = "cuda", max_length: int = 512) -> HFEmbedder:
+def load_t5(device, max_length: int = 512) -> HFEmbedder:
     # max length 64, 128, 256 and 512 should work (if your sequence is short enough)
     return HFEmbedder(
         "google/t5-v1_1-xxl", max_length=max_length, dtype=jnp.bfloat16
     ).to(device)
 
 
-def load_clip(device: str | jnp.device = "cuda") -> HFEmbedder:
+def load_clip(device="cuda") -> HFEmbedder:
     return HFEmbedder(
         "openai/clip-vit-large-patch14", max_length=77, torch_dtype=jnp.bfloat16
     ).to(device)
 
 
 def load_ae(
-    name: str, device: str | jnp.device = "cuda", hf_download: bool = True
+    name: str, device = "cuda", hf_download: bool = True
 ) -> AutoEncoder:
     ckpt_path = configs[name].ae_path
     if (

@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
-import torch
-from torch import Tensor, nn
-
+from flax import nnx
+from jax import numpy as jnp
+from jax import Array
 from jflux.modules.layers import (
     DoubleStreamBlock,
     EmbedND,
@@ -29,7 +29,7 @@ class FluxParams:
     guidance_embed: bool
 
 
-class Flux(nn.Module):
+class Flux(nnx.Module):
     """
     Transformer model for flow matching on sequences.
     """
@@ -89,14 +89,14 @@ class Flux(nn.Module):
 
     def forward(
         self,
-        img: Tensor,
-        img_ids: Tensor,
-        txt: Tensor,
-        txt_ids: Tensor,
-        timesteps: Tensor,
-        y: Tensor,
-        guidance: Tensor | None = None,
-    ) -> Tensor:
+        img: Array,
+        img_ids: Array,
+        txt: Array,
+        txt_ids: Array,
+        timesteps: Array,
+        y: Array,
+        guidance: Array | None = None,
+    ) -> Array:
         if img.ndim != 3 or txt.ndim != 3:
             raise ValueError("Input img and txt tensors must have 3 dimensions.")
 
@@ -112,13 +112,13 @@ class Flux(nn.Module):
         vec = vec + self.vector_in(y)
         txt = self.txt_in(txt)
 
-        ids = torch.cat((txt_ids, img_ids), dim=1)
+        ids = jnp.cat((txt_ids, img_ids), dim=1)
         pe = self.pe_embedder(ids)
 
         for block in self.double_blocks:
             img, txt = block(img=img, txt=txt, vec=vec, pe=pe)
 
-        img = torch.cat((txt, img), 1)
+        img = jnp.cat((txt, img), 1)
         for block in self.single_blocks:
             img = block(img, vec=vec, pe=pe)
         img = img[:, txt.shape[1] :, ...]
