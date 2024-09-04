@@ -1,6 +1,12 @@
-from transformers import FlaxCLIPTextModel, CLIPTokenizer, FlaxT5EncoderModel, T5Tokenizer
+from transformers import (
+    FlaxCLIPTextModel,
+    CLIPTokenizer,
+    FlaxT5EncoderModel,
+    T5Tokenizer,
+)
 from jax import Array
 from flax import nnx
+
 
 class HFEmbedder(nnx.Module):
     def __init__(self, version: str, max_length: int, **hf_kwargs):

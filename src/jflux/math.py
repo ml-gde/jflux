@@ -1,16 +1,13 @@
 from einops import rearrange
-from jax import (
-    Array,
-    numpy as jnp,
-    nn
-)
+from jax import Array, numpy as jnp, nn
+
 
 def attention(q: Array, k: Array, v: Array, pe: Array) -> Array:
     q, k = apply_rope(q, k, pe)
 
-    x = rearrange(x, "B H L D -> B L H D") # jax expects this shape
+    x = rearrange(x, "B H L D -> B L H D")  # jax expects this shape
     x = nn.dot_product_attention(q, k, v)
-    x = rearrange(x, "B L H D -> B L (H D)") # reshape again
+    x = rearrange(x, "B L H D -> B L (H D)")  # reshape again
 
     return x
 
@@ -30,4 +27,6 @@ def apply_rope(xq: Array, xk: Array, freqs_cis: Array) -> tuple[Array, Array]:
     xk_ = xk.astype(jnp.float32).reshape(*xk.shape[:-1], -1, 1, 2)
     xq_out = freqs_cis[..., 0] * xq_[..., 0] + freqs_cis[..., 1] * xq_[..., 1]
     xk_out = freqs_cis[..., 0] * xk_[..., 0] + freqs_cis[..., 1] * xk_[..., 1]
-    return xq_out.reshape(*xq.shape).astype(xq.dtype), xk_out.reshape(*xk.shape).astype(xk.dtype)
+    return xq_out.reshape(*xq.shape).astype(xq.dtype), xk_out.reshape(*xk.shape).astype(
+        xk.dtype
+    )

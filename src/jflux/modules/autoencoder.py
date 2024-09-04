@@ -1,12 +1,8 @@
 from dataclasses import dataclass
 
-from jax import (
-    Array,
-    numpy as jnp
-)
+from jax import Array, numpy as jnp
 from flax import nnx
 from einops import rearrange
-
 
 
 @dataclass
@@ -143,7 +139,9 @@ class Encoder(nnx.Module):
         self.resolution = resolution
         self.in_channels = in_channels
         # downsampling
-        self.conv_in = nnx.Conv(in_channels, self.ch, kernel_size=3, stride=1, padding=1)
+        self.conv_in = nnx.Conv(
+            in_channels, self.ch, kernel_size=3, stride=1, padding=1
+        )
 
         curr_res = resolution
         in_ch_mult = (1,) + tuple(ch_mult)
@@ -229,7 +227,9 @@ class Decoder(nnx.Module):
         self.z_shape = (1, z_channels, curr_res, curr_res)
 
         # z to block_in
-        self.conv_in = nnx.Conv(z_channels, block_in, kernel_size=3, stride=1, padding=1)
+        self.conv_in = nnx.Conv(
+            z_channels, block_in, kernel_size=3, stride=1, padding=1
+        )
 
         # middle
         self.mid = nnx.Module()

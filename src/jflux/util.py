@@ -101,9 +101,7 @@ def print_load_warning(missing: list[str], unexpected: list[str]) -> None:
         print(f"Got {len(unexpected)} unexpected keys:\n\t" + "\n\t".join(unexpected))
 
 
-def load_flow_model(
-    name: str, device = "cuda", hf_download: bool = True
-):
+def load_flow_model(name: str, device="cuda", hf_download: bool = True):
     # Loading Flux
     print("Init model")
     ckpt_path = configs[name].ckpt_path
@@ -140,9 +138,7 @@ def load_clip(device="cuda") -> HFEmbedder:
     ).to(device)
 
 
-def load_ae(
-    name: str, device = "cuda", hf_download: bool = True
-) -> AutoEncoder:
+def load_ae(name: str, device="cuda", hf_download: bool = True) -> AutoEncoder:
     ckpt_path = configs[name].ae_path
     if (
         ckpt_path is None

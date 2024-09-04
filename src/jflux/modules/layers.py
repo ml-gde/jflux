@@ -40,9 +40,7 @@ def timestep_embedding(t: Array, dim, max_period=10000, time_factor: float = 100
     t = time_factor * t
     half = dim // 2
     freqs = jnp.exp(
-        -math.log(max_period)
-        * jnp.arange(start=0, end=half, dtype=jnp.float32)
-        / half
+        -math.log(max_period) * jnp.arange(start=0, end=half, dtype=jnp.float32) / half
     ).to(t.device)
 
     args = t[:, None].float() * freqs[None]
@@ -123,7 +121,9 @@ class Modulation(nnx.Module):
         self.lin = nnx.Linear(dim, self.multiplier * dim, bias=True)
 
     def __call__(self, vec: Array) -> tuple[ModulationOut, ModulationOut | None]:
-        out = self.lin(nnx.functional.silu(vec))[:, None, :].chunk(self.multiplier, dim=-1)
+        out = self.lin(nnx.functional.silu(vec))[:, None, :].chunk(
+            self.multiplier, dim=-1
+        )
 
         return (
             ModulationOut(*out[:3]),
