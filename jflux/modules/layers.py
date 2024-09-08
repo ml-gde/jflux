@@ -12,7 +12,7 @@ from jflux.math import attention, rope
 
 
 class EmbedND(nnx.Module):
-    def __init__(self, dim: int, theta: int, axes_dim: list[int]):
+    def __init__(self, dim: int, theta: int, axes_dim: list[int]) -> None:
         super().__init__()
         self.dim = dim
         self.theta = theta

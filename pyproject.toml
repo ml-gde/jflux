@@ -12,6 +12,7 @@ dependencies = [
     "flux-jax",
     "jax[cuda12]>=0.4.31",
     "pillow>=10.4.0",
+    "pytest>=8.3.2",
     "ruff>=0.6.3",
     "transformers>=4.44.2",
 ]

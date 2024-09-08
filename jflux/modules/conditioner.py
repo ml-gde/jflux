@@ -9,7 +9,7 @@ from flax import nnx
 
 
 class HFEmbedder(nnx.Module):
-    def __init__(self, version: str, max_length: int, **hf_kwargs):
+    def __init__(self, version: str, max_length: int, **hf_kwargs) -> None:
         super().__init__()
         self.is_clip = version.startswith("openai")
         self.max_length = max_length

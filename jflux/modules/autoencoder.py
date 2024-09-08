@@ -1,8 +1,12 @@
 from dataclasses import dataclass
 
-from jax import Array, numpy as jnp
+import jax
+import jax.numpy as jnp
+from jax import Array
 from flax import nnx
 from einops import rearrange
+
+from jflux.sampling import interpolate
 
 
 @dataclass
@@ -18,106 +22,146 @@ class AutoEncoderParams:
     shift_factor: float
 
 
-def swish(x: Array) -> Array:
-    return x * jnp.sigmoid(x)
-
-
 class AttnBlock(nnx.Module):
-    def __init__(self, in_channels: int):
-        super().__init__()
+    def __init__(self, in_channels: int, rngs: nnx.Rngs) -> None:
         self.in_channels = in_channels
 
         self.norm = nnx.GroupNorm(
-            num_groups=32, num_channels=in_channels, eps=1e-6, affine=True
+            num_groups=32, num_features=in_channels, epsilon=1e-6, rngs=rngs
         )
 
-        self.q = nnx.Conv(in_channels, in_channels, kernel_size=1)
-        self.k = nnx.Conv(in_channels, in_channels, kernel_size=1)
-        self.v = nnx.Conv(in_channels, in_channels, kernel_size=1)
-        self.proj_out = nnx.Conv(in_channels, in_channels, kernel_size=1)
+        self.query_layer = nnx.Conv(
+            in_features=in_channels,
+            out_features=in_channels,
+            kernel_size=(1, 1),
+            rngs=rngs,
+        )
+        self.key_layer = nnx.Conv(
+            in_features=in_channels,
+            out_features=in_channels,
+            kernel_size=(1, 1),
+            rngs=rngs,
+        )
+        self.value_layer = nnx.Conv(
+            in_features=in_channels,
+            out_features=in_channels,
+            kernel_size=(1, 1),
+            rngs=rngs,
+        )
+        self.projection = nnx.Conv(
+            in_features=in_channels,
+            out_features=in_channels,
+            kernel_size=(1, 1),
+            rngs=rngs,
+        )
 
-    def attention(self, h_: Array) -> Array:
-        h_ = self.norm(h_)
-        q = self.q(h_)
-        k = self.k(h_)
-        v = self.v(h_)
+    def attention(self, input_tensor: Array) -> Array:
+        # Apply Group Norm
+        input_tensor = self.norm(input_tensor)
 
-        b, c, h, w = q.shape
-        q = rearrange(q, "b c h w -> b 1 (h w) c").contiguous()
-        k = rearrange(k, "b c h w -> b 1 (h w) c").contiguous()
-        v = rearrange(v, "b c h w -> b 1 (h w) c").contiguous()
-        h_ = nnx.functional.scaled_dot_product_attention(q, k, v)
+        # Calculate Query, Key and Values
+        query = self.query_layer(input_tensor)
+        key = self.key_layer(input_tensor)
+        value = self.value_layer(input_tensor)
 
-        return rearrange(h_, "b 1 (h w) c -> b c h w", h=h, w=w, c=c, b=b)
+        # Reshape for JAX Attention impl
+        b, c, h, w = query.shape
+        query = rearrange(query, "b c h w -> b (h w) 1 c")
+        key = rearrange(key, "b c h w -> b (h w) 1 c")
+        value = rearrange(value, "b c h w -> b (h w) 1 c")
+
+        # Calculate Attention
+        input_tensor = nnx.dot_product_attention(query, key, value)
+        return rearrange(input_tensor, "b (h w) 1 c -> b c h w", h=h, w=w, c=c, b=b)
 
     def __call__(self, x: Array) -> Array:
-        return x + self.proj_out(self.attention(x))
+        return x + self.projection(self.attention(x))
 
 
 class ResnetBlock(nnx.Module):
-    def __init__(self, in_channels: int, out_channels: int):
-        super().__init__()
+    def __init__(self, in_channels: int, out_channels: int, rngs: nnx.Rngs) -> None:
         self.in_channels = in_channels
         out_channels = in_channels if out_channels is None else out_channels
         self.out_channels = out_channels
 
         self.norm1 = nnx.GroupNorm(
-            num_groups=32, num_channels=in_channels, eps=1e-6, affine=True
+            num_groups=32, num_features=in_channels, epsilon=1e-6, rngs=rngs
         )
         self.conv1 = nnx.Conv(
-            in_channels, out_channels, kernel_size=3, stride=1, padding=1
+            in_features=in_channels,
+            out_features=out_channels,
+            kernel_size=(3, 3),
+            strides=(1, 1),
+            padding=(1, 1),
+            rngs=rngs,
         )
         self.norm2 = nnx.GroupNorm(
-            num_groups=32, num_channels=out_channels, eps=1e-6, affine=True
+            num_groups=32, num_features=in_channels, epsilon=1e-6, rngs=rngs
         )
         self.conv2 = nnx.Conv(
-            out_channels, out_channels, kernel_size=3, stride=1, padding=1
+            in_features=in_channels,
+            out_features=out_channels,
+            kernel_size=(3, 3),
+            strides=(1, 1),
+            padding=(1, 1),
+            rngs=rngs,
         )
         if self.in_channels != self.out_channels:
             self.nin_shortcut = nnx.Conv(
-                in_channels, out_channels, kernel_size=1, stride=1, padding=0
+                in_features=in_channels,
+                out_features=out_channels,
+                kernel_size=(3, 3),
+                strides=(1, 1),
+                padding=(0, 0),
+                rngs=rngs,
             )
 
-    def __call__(self, x):
-        h = x
+    def __call__(self, input_tensor: Array) -> Array:
+        h = input_tensor
         h = self.norm1(h)
-        h = swish(h)
+        h = jax.nn.swish(h)
         h = self.conv1(h)
 
         h = self.norm2(h)
-        h = swish(h)
+        h = jax.nn.swish(h)
         h = self.conv2(h)
 
         if self.in_channels != self.out_channels:
-            x = self.nin_shortcut(x)
+            input_tensor = self.nin_shortcut(input_tensor)
 
-        return x + h
+        return input_tensor + h
 
 
 class Downsample(nnx.Module):
-    def __init__(self, in_channels: int):
-        super().__init__()
-        # no asymmetric padding in jnp.conv, must do it ourselves
+    def __init__(self, in_channels: int, rngs: nnx.Rngs) -> None:
         self.conv = nnx.Conv(
-            in_channels, in_channels, kernel_size=3, stride=2, padding=0
+            in_features=in_channels,
+            out_features=in_channels,
+            kernel_size=(3, 3),
+            strides=(1, 1),
+            padding=(0, 0),
+            rngs=rngs,
         )
 
-    def __call__(self, x: Array):
-        pad = (0, 1, 0, 1)
-        x = nnx.functional.pad(x, pad, mode="constant", value=0)
+    def __call__(self, x: Array) -> Array:
+        x = jnp.pad(array=x, pad_width=(0, 1, 0, 1), mode="constant", constant_values=0)
         x = self.conv(x)
         return x
 
 
 class Upsample(nnx.Module):
-    def __init__(self, in_channels: int):
-        super().__init__()
+    def __init__(self, in_channels: int, rngs: nnx.Rngs) -> None:
         self.conv = nnx.Conv(
-            in_channels, in_channels, kernel_size=3, stride=1, padding=1
+            in_features=in_channels,
+            out_features=in_channels,
+            kernel_size=(3, 3),
+            strides=(1, 1),
+            padding=(1, 1),
+            rngs=rngs,
         )
 
-    def __call__(self, x: Array):
-        x = nnx.functional.interpolate(x, scale_factor=2.0, mode="nearest")
+    def __call__(self, x: Array) -> Array:
+        x = interpolate(x, scale_factor=2.0, method="nearest")
         x = self.conv(x)
         return x
 
@@ -131,8 +175,8 @@ class Encoder(nnx.Module):
         ch_mult: list[int],
         num_res_blocks: int,
         z_channels: int,
+        rngs: nnx.Rngs,
     ):
-        super().__init__()
         self.ch = ch
         self.num_resolutions = len(ch_mult)
         self.num_res_blocks = num_res_blocks
@@ -140,7 +184,12 @@ class Encoder(nnx.Module):
         self.in_channels = in_channels
         # downsampling
         self.conv_in = nnx.Conv(
-            in_channels, self.ch, kernel_size=3, stride=1, padding=1
+            in_features=in_channels,
+            out_features=self.ch,
+            kernel_size=(3, 3),
+            strides=(1, 1),
+            padding=(1, 1),
+            rngs=rngs,
         )
 
         curr_res = resolution
@@ -166,16 +215,25 @@ class Encoder(nnx.Module):
 
         # middle
         self.mid = nnx.Module()
-        self.mid.block_1 = ResnetBlock(in_channels=block_in, out_channels=block_in)
-        self.mid.attn_1 = AttnBlock(block_in)
-        self.mid.block_2 = ResnetBlock(in_channels=block_in, out_channels=block_in)
+        self.mid.block_1 = ResnetBlock(
+            in_channels=block_in, out_channels=block_in, rngs=rngs
+        )
+        self.mid.attn_1 = AttnBlock(in_channels=block_in, rngs=rngs)
+        self.mid.block_2 = ResnetBlock(
+            in_channels=block_in, out_channels=block_in, rngs=rngs
+        )
 
         # end
         self.norm_out = nnx.GroupNorm(
-            num_groups=32, num_channels=block_in, eps=1e-6, affine=True
+            num_groups=32, num_features=block_in, epsilon=1e-6, rngs=rngs
         )
         self.conv_out = nnx.Conv(
-            block_in, 2 * z_channels, kernel_size=3, stride=1, padding=1
+            in_features=block_in,
+            out_features=2 * z_channels,
+            kernel_size=(3, 3),
+            strides=(1, 1),
+            padding=(1, 1),
+            rngs=rngs,
         )
 
     def __call__(self, x: Array) -> Array:
@@ -197,7 +255,7 @@ class Encoder(nnx.Module):
         h = self.mid.block_2(h)
         # end
         h = self.norm_out(h)
-        h = swish(h)
+        h = jax.nn.swish(h)
         h = self.conv_out(h)
         return h
 
@@ -212,8 +270,8 @@ class Decoder(nnx.Module):
         in_channels: int,
         resolution: int,
         z_channels: int,
+        rngs: nnx.Rngs,
     ):
-        super().__init__()
         self.ch = ch
         self.num_resolutions = len(ch_mult)
         self.num_res_blocks = num_res_blocks
@@ -228,7 +286,12 @@ class Decoder(nnx.Module):
 
         # z to block_in
         self.conv_in = nnx.Conv(
-            z_channels, block_in, kernel_size=3, stride=1, padding=1
+            in_features=z_channels,
+            out_features=block_in,
+            kernel_size=(3, 3),
+            strides=(1, 1),
+            padding=(1, 1),
+            rngs=rngs,
         )
 
         # middle
@@ -256,9 +319,16 @@ class Decoder(nnx.Module):
 
         # end
         self.norm_out = nnx.GroupNorm(
-            num_groups=32, num_channels=block_in, eps=1e-6, affine=True
+            num_groups=32, num_features=block_in, epsilon=1e-6, rngs=rngs
         )
-        self.conv_out = nnx.Conv(block_in, out_ch, kernel_size=3, stride=1, padding=1)
+        self.conv_out = nnx.Conv(
+            in_features=block_in,
+            out_features=out_ch,
+            kernel_size=(3, 3),
+            strides=(1, 1),
+            padding=(1, 1),
+            rngs=rngs,
+        )
 
     def __call__(self, z: Array) -> Array:
         # z to block_in
@@ -280,14 +350,13 @@ class Decoder(nnx.Module):
 
         # end
         h = self.norm_out(h)
-        h = swish(h)
+        h = jax.nn.swish(h)
         h = self.conv_out(h)
         return h
 
 
 class DiagonalGaussian(nnx.Module):
     def __init__(self, sample: bool = True, chunk_dim: int = 1):
-        super().__init__()
         self.sample = sample
         self.chunk_dim = chunk_dim
 
@@ -302,7 +371,6 @@ class DiagonalGaussian(nnx.Module):
 
 class AutoEncoder(nnx.Module):
     def __init__(self, params: AutoEncoderParams):
-        super().__init__()
         self.encoder = Encoder(
             resolution=params.resolution,
             in_channels=params.in_channels,

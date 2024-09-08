@@ -45,6 +45,7 @@ def main(
     num_steps: int | None = None,
     loop: bool = False,
     guidance: float = 3.5,
+    # TODO: JAX variant of offloading to CPU
     offload: bool = False,
     output_dir: str = "output",
     add_sampling_metadata: bool = True,
@@ -111,7 +112,8 @@ def main(
     model = load_flow_model(name, device="cpu" if offload else jax_device)
     ae = load_ae(name, device="cpu" if offload else jax_device)
 
-    rngs = nnx.Rngs(0)
+    # TODO (ariG23498)
+    # rngs = nnx.Rngs(0)
     opts = SamplingOptions(
         prompt=prompt,
         width=width,
@@ -139,29 +141,32 @@ def main(
         seed=opts.seed,
     )
     opts.seed = None
-    if offload:
-        ae = ae.cpu()
-        torch.cuda.empty_cache()
-        t5, clip = t5.to(torch_device), clip.to(torch_device)
+    # TODO: JAX variant of offloading to CPU
+    # if offload:
+    #     ae = ae.cpu()
+    #     torch.cuda.empty_cache()
+    #     t5, clip = t5.to(torch_device), clip.to(torch_device)
     inp = prepare(t5, clip, x, prompt=opts.prompt)
     timesteps = get_schedule(
         opts.num_steps, inp["img"].shape[1], shift=(name != "flux-schnell")
     )
 
     # offload TEs to CPU, load model to gpu
-    if offload:
-        t5, clip = t5.cpu(), clip.cpu()
-        torch.cuda.empty_cache()
-        model = model.to(torch_device)
+    # TODO: JAX variant of offloading to CPU
+    # if offload:
+    #     t5, clip = t5.cpu(), clip.cpu()
+    #     torch.cuda.empty_cache()
+    #     model = model.to(torch_device)
 
     # denoise initial noise
     x = denoise(model, **inp, timesteps=timesteps, guidance=opts.guidance)
 
     # offload model, load autoencoder to gpu
-    if offload:
-        model.cpu()
-        torch.cuda.empty_cache()
-        ae.decoder.to(x.device)
+    # TODO: JAX variant of offloading to CPU
+    # if offload:
+    #     model.cpu()
+    #     torch.cuda.empty_cache()
+    #     ae.decoder.to(x.device)
 
     # decode latents to pixel space
     x = unpack(x.float(), opts.height, opts.width)
@@ -173,23 +178,7 @@ def main(
     print(f"Done in {t1 - t0:.1f}s. Saving {fn}")
     # bring into PIL format and save
     x = x.clamp(-1, 1)
-    x = embed_watermark(x.float())
     x = rearrange(x[0], "c h w -> h w c")
-
-    img = Image.fromarray((127.5 * (x + 1.0)).cpu().byte().numpy())
-    nsfw_score = [x["score"] for x in nsfw_classifier(img) if x["label"] == "nsfw"][0]
-
-    if nsfw_score < NSFW_THRESHOLD:
-        exif_data = Image.Exif()
-        exif_data[ExifTags.Base.Software] = "AI generated;txt2img;flux"
-        exif_data[ExifTags.Base.Make] = "Black Forest Labs"
-        exif_data[ExifTags.Base.Model] = name
-        if add_sampling_metadata:
-            exif_data[ExifTags.Base.ImageDescription] = prompt
-        img.save(fn, exif=exif_data, quality=95, subsampling=0)
-        idx += 1
-    else:
-        print("Your generated image may contain NSFW content.")
 
     if loop:
         print("-" * 80)

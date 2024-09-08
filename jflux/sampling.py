@@ -3,6 +3,8 @@ from typing import Callable
 
 from einops import rearrange, repeat
 
+import jax
+from jax.image import ResizeMethod
 from jax import numpy as jnp
 from jax import Array
 from jflux.model import Flux
@@ -138,3 +140,15 @@ def unpack(x: Array, height: int, width: int) -> Array:
         ph=2,
         pw=2,
     )
+
+
+def interpolate(x: Array, scale_factor: float, method: str | ResizeMethod) -> Array:
+    if isinstance(scale_factor, (int, float)):
+        scale_factor = (scale_factor, scale_factor)
+
+    input_shape = x.shape
+    new_shape = tuple(
+        int(dim * factor) for dim, factor in zip(input_shape[-2:], scale_factor)
+    )
+
+    return jax.image.resize(x, x.shape[:-2] + new_shape, method=method)

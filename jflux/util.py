@@ -2,7 +2,6 @@ import os
 from dataclasses import dataclass
 
 from jax import numpy as jnp
-from einops import rearrange
 from huggingface_hub import hf_hub_download
 from safetensors.numpy import load_file as load_sft
 
