@@ -251,11 +251,12 @@ class Encoder(nnx.Module):
         curr_res = resolution
         in_ch_mult = (1,) + tuple(ch_mult)
         self.in_ch_mult = in_ch_mult
+        # FIXME: Use nnx.Sequential instead
         self.down = nnx.ModuleList()
         block_in = self.ch
         for i_level in range(self.num_resolutions):
+            # FIXME: Use nnx.Sequential instead
             block = nnx.ModuleList()
-            attn = nnx.ModuleList()
             block_in = ch * in_ch_mult[i_level]
             block_out = ch * ch_mult[i_level]
             for _ in range(self.num_res_blocks):
@@ -265,20 +266,16 @@ class Encoder(nnx.Module):
                 block_in = block_out
             down = nnx.Module()
             down.block = block
-            down.attn = attn
             if i_level != self.num_resolutions - 1:
                 down.downsample = Downsample(in_channels=block_in, rngs=rngs)
                 curr_res = curr_res // 2
             self.down.append(down)
 
         # middle
-        self.mid = nnx.Module()
-        self.mid.block_1 = ResnetBlock(
-            in_channels=block_in, out_channels=block_in, rngs=rngs
-        )
-        self.mid.attn_1 = AttnBlock(in_channels=block_in, rngs=rngs)
-        self.mid.block_2 = ResnetBlock(
-            in_channels=block_in, out_channels=block_in, rngs=rngs
+        self.middle = nnx.Sequential(
+            ResnetBlock(in_channels=block_in, out_channels=block_in, rngs=rngs),
+            AttnBlock(in_channels=block_in, rngs=rngs),
+            ResnetBlock(in_channels=block_in, out_channels=block_in, rngs=rngs),
         )
 
         # end
@@ -308,9 +305,7 @@ class Encoder(nnx.Module):
 
         # middle
         h = hs[-1]
-        h = self.mid.block_1(h)
-        h = self.mid.attn_1(h)
-        h = self.mid.block_2(h)
+        h = self.middle(h)
         # end
         h = self.norm_out(h)
         h = jax.nn.swish(h)
@@ -367,20 +362,18 @@ class Decoder(nnx.Module):
         )
 
         # middle
-        self.mid = nnx.Module()
-        self.mid.block_1 = ResnetBlock(
-            in_channels=block_in, out_channels=block_in, rngs=rngs
-        )
-        self.mid.attn_1 = AttnBlock(in_channels=block_in, rngs=rngs)
-        self.mid.block_2 = ResnetBlock(
-            in_channels=block_in, out_channels=block_in, rngs=rngs
+        self.middle = nnx.Sequential(
+            ResnetBlock(in_channels=block_in, out_channels=block_in, rngs=rngs),
+            AttnBlock(in_channels=block_in, rngs=rngs),
+            ResnetBlock(in_channels=block_in, out_channels=block_in, rngs=rngs),
         )
 
         # upsampling
+        # FIXME: Use nnx.Sequential instead
         self.up = nnx.ModuleList()
         for i_level in reversed(range(self.num_resolutions)):
+            # FIXME: Use nnx.Sequential instead
             block = nnx.ModuleList()
-            attn = nnx.ModuleList()
             block_out = ch * ch_mult[i_level]
             for _ in range(self.num_res_blocks + 1):
                 block.append(
@@ -389,7 +382,6 @@ class Decoder(nnx.Module):
                 block_in = block_out
             up = nnx.Module()
             up.block = block
-            up.attn = attn
             if i_level != 0:
                 up.upsample = Upsample(in_channels=block_in, rngs=rngs)
                 curr_res = curr_res * 2
@@ -413,9 +405,7 @@ class Decoder(nnx.Module):
         h = self.conv_in(z)
 
         # middle
-        h = self.mid.block_1(h)
-        h = self.mid.attn_1(h)
-        h = self.mid.block_2(h)
+        h = self.middle(h)
 
         # upsampling
         for i_level in reversed(range(self.num_resolutions)):
