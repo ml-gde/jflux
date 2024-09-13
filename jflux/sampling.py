@@ -183,7 +183,23 @@ def denoise(
     # sampling parameters
     timesteps: list[float],
     guidance: float = 4.0,
-):
+) -> Array:
+    """
+    Denoise the image using the model
+
+    Args:
+        model (Flux): Model
+        img (Array): Image tensor
+        img_ids (Array): Image ids
+        txt (Array): Text tensor
+        txt_ids (Array): Text ids
+        vec (Array): Vector tensor
+        timesteps (list[float]): Timesteps
+        guidance (float, optional): Guidance. Defaults to 4.0.
+
+    Returns:
+        Array: Denoised image tensor
+    """
     # this is ignored for schnell
     guidance_vec = jnp.full(
         (img.shape[0],), guidance, device=img.device, dtype=img.dtype
