@@ -7,6 +7,8 @@ from glob import iglob
 from fire import Fire
 
 import jax
+import jax.numpy as jnp
+from jax.typing import DTypeLike
 from jflux.sampling import denoise, get_noise, get_schedule, prepare, unpack
 from jflux.util import (
     configs,
@@ -112,6 +114,8 @@ def main(
     # TODO: JAX variant of offloading to CPU
     offload: bool = False,
     output_dir: str = "output",
+    dtype: DTypeLike = jax.dtypes.bfloat16,
+    param_dtype: DTypeLike = None,
 ) -> None:
     """
     Sample the flux model.
@@ -128,7 +132,12 @@ def main(
         guidance(float, optional): Guidance for the model, defaults to 3.5.
         offload(bool, optional): Whether to offload the model to CPU, defaults to False.
         output_dir(str, optional): Directory to save the output images in, defaults to 'output'.
+        dtype(DTypeLike, optional): Data type for the model, defaults to jax.dtypes.bfloat16.
+        param_dtype(DTypeLike, optional): Data type for the model parameters, defaults to None.
     """
+
+    if param_dtype is None:
+        param_dtype = dtype
 
     if name not in configs:
         available = ", ".join(configs.keys())
@@ -169,10 +178,20 @@ def main(
     import sys
 
     sys.exit(0)
-    t5 = load_t5(jax_device, max_length=256 if name == "flux-schnell" else 512)
-    clip = load_clip(jax_device)
-    model = load_flow_model(name, device="cpu" if offload else jax_device)
-    ae = load_ae(name, device="cpu" if offload else jax_device)
+    t5 = load_t5(max_length=256 if name == "flux-schnell" else 512)
+    clip = load_clip()
+    model = load_flow_model(
+        name,
+        device="cpu" if offload else jax_device,
+        dtype=dtype,
+        param_dtype=param_dtype,
+    )
+    ae = load_ae(
+        name,
+        device="cpu" if offload else jax_device,
+        dtype=dtype,
+        param_dtype=param_dtype,
+    )
 
     # TODO (ariG23498)
     # rngs = nnx.Rngs(0)
@@ -232,7 +251,7 @@ def main(
         #     ae.decoder.to(x.device)
 
         # decode latents to pixel space
-        x = unpack(x.float(), opts.height, opts.width)
+        x = unpack(x.astype(jnp.float32), opts.height, opts.width)
         x = ae.decode(x).astype(dtype=jax.dtypes.bfloat16)  # noqa
         t1 = time.perf_counter()
 

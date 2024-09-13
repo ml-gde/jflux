@@ -2,6 +2,7 @@ import math
 
 import jax
 import jax.numpy as jnp
+from jax.typing import DTypeLike
 from chex import Array
 from flax import nnx
 from functools import partial
@@ -61,7 +62,7 @@ def timestep_embedding(
     # Determine frequencies using exponential decay
     freqs = jnp.exp(
         -math.log(max_period)
-        * jnp.arange(start=0, stop=half, dtype=jnp.float32, device=t.device())
+        * jnp.arange(start=0, stop=half, dtype=jnp.float32, device=t.device)
         / half
     )
 
@@ -87,15 +88,30 @@ class QKNorm(nnx.Module):
     Args:
         dim (int): Dimension of the hidden layer.
         rngs (nnx.Rngs): RNGs for the layer.
+        dtype (DTypeLike): Data type for the layer.
+        param_dtype (DTypeLike): Data type for the layer parameters.
 
     Returns:
         Normalized query and key values
     """
 
-    def __init__(self, dim: int, rngs: nnx.Rngs) -> None:
+    def __init__(
+        self,
+        dim: int,
+        rngs: nnx.Rngs,
+        dtype: DTypeLike = jax.dtypes.bfloat16,
+        param_dtype: DTypeLike = None,
+    ) -> None:
+        if param_dtype is None:
+            param_dtype = dtype
+
         # RMS Normalization for query and key
-        self.query_norm = nnx.RMSNorm(dim, rngs=rngs)
-        self.key_norm = nnx.RMSNorm(dim, rngs=rngs)
+        self.query_norm = nnx.RMSNorm(
+            dim, rngs=rngs, dtype=dtype, param_dtype=param_dtype
+        )
+        self.key_norm = nnx.RMSNorm(
+            dim, rngs=rngs, dtype=dtype, param_dtype=param_dtype
+        )
 
     def __call__(self, q: Array, k: Array, v: Array) -> tuple[Array, Array]:
         q = self.query_norm(q)
@@ -112,23 +128,46 @@ class AdaLayerNorm(nnx.Module):
         patch_size (int): patch size.
         out_channels (int): Number of output channels.
         rngs (nnx.Rngs): RNGs for the layer.
+        dtype (DTypeLike): Data type for the layer.
+        param_dtype (DTypeLike): Data type for the layer parameters.
 
     Returns:
         Normalized layer incorporating timestep embeddings.
     """
 
     def __init__(
-        self, hidden_size: int, patch_size: int, out_channels: int, rngs: nnx.Rngs
+        self,
+        hidden_size: int,
+        patch_size: int,
+        out_channels: int,
+        rngs: nnx.Rngs,
+        dtype: DTypeLike = jax.dtypes.bfloat16,
+        param_dtype: DTypeLike = None,
     ) -> None:
-        self.norm_final = nnx.LayerNorm(hidden_size, epsilon=1e-6, rngs=rngs)
+        if param_dtype is None:
+            param_dtype = dtype
+
+        self.norm_final = nnx.LayerNorm(
+            hidden_size, epsilon=1e-6, rngs=rngs, dtype=dtype, param_dtype=param_dtype
+        )
         self.linear = nnx.Linear(
             hidden_size,
             patch_size * patch_size * out_channels,
             use_bias=True,
             rngs=rngs,
+            dtype=dtype,
+            param_dtype=param_dtype,
         )
         self.adaLN_modulation = nnx.Sequential(
-            nnx.silu, nnx.Linear(hidden_size, 2 * hidden_size, use_bias=True, rngs=rngs)
+            nnx.silu,
+            nnx.Linear(
+                hidden_size,
+                2 * hidden_size,
+                use_bias=True,
+                rngs=rngs,
+                dtype=dtype,
+                param_dtype=param_dtype,
+            ),
         )
 
     def __call__(self, x: Array, vec: Array) -> Array:

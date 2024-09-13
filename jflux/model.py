@@ -1,8 +1,10 @@
 from dataclasses import dataclass
 
+import jax.dtypes
 from flax import nnx
 from jax import numpy as jnp
 from chex import Array
+from jax.typing import DTypeLike
 from jflux.layers import (
     Identity,
     Embed,
@@ -31,10 +33,26 @@ class FluxParams:
 class Flux(nnx.Module):
     """
     Transformer model for flow matching on sequences.
+
+    Args:
+        params (FluxParams): Model parameters.
+        rngs (nnx.Rngs): Random number generators.
+        dtype (DTypeLike, optional): Data type for the model. Defaults to jax.dtypes.bfloat16.
+        param_dtype (DTypeLike, optional): Data type for the model parameters. Defaults to None.
     """
 
-    def __init__(self, params: FluxParams, rngs: nnx.Rngs) -> None:
+    def __init__(
+        self,
+        params: FluxParams,
+        rngs: nnx.Rngs,
+        dtype: DTypeLike = jax.dtypes.bfloat16,
+        param_dtype: DTypeLike = None,
+    ) -> None:
         self.params = params
+        self.rngs = rngs
+        self.dtype = dtype
+        if param_dtype is None:
+            self.param_dtype = dtype
         self.in_channels = params.in_channels
         self.out_channels = self.in_channels
         if params.hidden_size % params.num_heads != 0:
@@ -52,16 +70,45 @@ class Flux(nnx.Module):
             dim=pe_dim, theta=params.theta, axes_dim=params.axes_dim
         )
         self.img_in = nnx.Linear(
-            self.in_channels, self.hidden_size, use_bias=True, rngs=rngs
+            self.in_channels,
+            self.hidden_size,
+            use_bias=True,
+            dtype=self.dtype,
+            param_dtype=self.param_dtype,
+            rngs=rngs,
         )
-        self.time_in = MLPEmbedder(in_dim=256, hidden_dim=self.hidden_size, rngs=rngs)
-        self.vector_in = MLPEmbedder(params.vec_in_dim, self.hidden_size, rngs=rngs)
+        self.time_in = MLPEmbedder(
+            in_dim=256,
+            hidden_dim=self.hidden_size,
+            rngs=rngs,
+            dtype=self.dtype,
+            param_dtype=self.param_dtype,
+        )
+        self.vector_in = MLPEmbedder(
+            params.vec_in_dim,
+            self.hidden_size,
+            rngs=rngs,
+            dtype=self.dtype,
+            param_dtype=self.param_dtype,
+        )
         self.guidance_in = (
-            MLPEmbedder(in_dim=256, hidden_dim=self.hidden_size, rngs=rngs)
+            MLPEmbedder(
+                in_dim=256,
+                hidden_dim=self.hidden_size,
+                rngs=rngs,
+                dtype=self.dtype,
+                param_dtype=self.param_dtype,
+            )
             if params.guidance_embed
             else Identity()
         )
-        self.txt_in = nnx.Linear(params.context_in_dim, self.hidden_size, rngs=rngs)
+        self.txt_in = nnx.Linear(
+            params.context_in_dim,
+            self.hidden_size,
+            rngs=rngs,
+            dtype=self.dtype,
+            param_dtype=self.param_dtype,
+        )
 
         self.double_blocks = nnx.Sequential(
             *[
@@ -71,6 +118,8 @@ class Flux(nnx.Module):
                     mlp_ratio=params.mlp_ratio,
                     qkv_bias=params.qkv_bias,
                     rngs=rngs,
+                    dtype=self.dtype,
+                    param_dtype=self.param_dtype,
                 )
                 for _ in range(params.depth)
             ]
@@ -83,13 +132,20 @@ class Flux(nnx.Module):
                     self.num_heads,
                     mlp_ratio=params.mlp_ratio,
                     rngs=rngs,
+                    dtype=self.dtype,
+                    param_dtype=self.param_dtype,
                 )
                 for _ in range(params.depth_single_blocks)
             ]
         )
 
         self.final_layer = AdaLayerNorm(
-            self.hidden_size, 1, self.out_channels, rngs=rngs
+            self.hidden_size,
+            1,
+            self.out_channels,
+            rngs=rngs,
+            dtype=self.dtype,
+            param_dtype=self.param_dtype,
         )
 
     def __call__(

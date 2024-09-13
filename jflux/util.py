@@ -1,6 +1,9 @@
 import os
 from dataclasses import dataclass
 
+import jax
+from jax.typing import DTypeLike
+from flax import nnx
 from jax import numpy as jnp
 from huggingface_hub import hf_hub_download
 from safetensors.numpy import load_file as load_sft
@@ -100,7 +103,17 @@ def print_load_warning(missing: list[str], unexpected: list[str]) -> None:
         print(f"Got {len(unexpected)} unexpected keys:\n\t" + "\n\t".join(unexpected))
 
 
-def load_flow_model(name: str, device="cuda", hf_download: bool = True):
+def load_flow_model(
+    name: str,
+    rngs: nnx.Rngs,
+    device="cuda",
+    hf_download: bool = True,
+    dtype: DTypeLike = jax.dtypes.bfloat16,
+    param_dtype: DTypeLike = None,
+):
+    if param_dtype is None:
+        param_dtype = dtype
+
     # Loading Flux
     print("Init model")
     ckpt_path = configs[name].ckpt_path
@@ -112,8 +125,10 @@ def load_flow_model(name: str, device="cuda", hf_download: bool = True):
     ):
         ckpt_path = hf_hub_download(configs[name].repo_id, configs[name].repo_flow)
 
-    with jnp.device("meta" if ckpt_path is not None else device):
-        model = Flux(configs[name].params).to(jnp.bfloat16)  # type: ignore
+    with jax.default_device(device):
+        model = Flux(
+            configs[name].params, rngs=rngs, dtype=dtype, param_dtype=param_dtype
+        )
 
     if ckpt_path is not None:
         print("Loading checkpoint")
@@ -124,20 +139,30 @@ def load_flow_model(name: str, device="cuda", hf_download: bool = True):
     return model
 
 
-def load_t5(device, max_length: int = 512) -> HFEmbedder:
+# FIXME (ariG23498): Correct usage of device, HFEmbedder doesn't implement .to()
+def load_t5(max_length: int = 512) -> HFEmbedder:
     # max length 64, 128, 256 and 512 should work (if your sequence is short enough)
-    return HFEmbedder(
-        "google/t5-v1_1-xxl", max_length=max_length, dtype=jnp.bfloat16
-    ).to(device)
+    return HFEmbedder("google/t5-v1_1-xxl", max_length=max_length, dtype=jnp.bfloat16)
 
 
-def load_clip(device="cuda") -> HFEmbedder:
+# FIXME (ariG23498): Correct usage of device, HFEmbedder doesn't implement .to()
+def load_clip() -> HFEmbedder:
     return HFEmbedder(
         "openai/clip-vit-large-patch14", max_length=77, torch_dtype=jnp.bfloat16
-    ).to(device)
+    )
 
 
-def load_ae(name: str, device="cuda", hf_download: bool = True) -> AutoEncoder:
+def load_ae(
+    name: str,
+    rngs: nnx.Rngs,
+    device="cuda",
+    hf_download: bool = True,
+    dtype: DTypeLike = jax.dtypes.bfloat16,
+    param_dtype: DTypeLike = None,
+) -> AutoEncoder:
+    if param_dtype is None:
+        param_dtype = dtype
+
     ckpt_path = configs[name].ae_path
     if (
         ckpt_path is None
@@ -149,8 +174,10 @@ def load_ae(name: str, device="cuda", hf_download: bool = True) -> AutoEncoder:
 
     # Loading the autoencoder
     print("Init AE")
-    with jnp.device("meta" if ckpt_path is not None else device):
-        ae = AutoEncoder(configs[name].ae_params)  # type: ignore
+    with jax.default_device(device):
+        ae = AutoEncoder(
+            configs[name].ae_params, rngs=rngs, dtype=dtype, param_dtype=param_dtype
+        )
 
     if ckpt_path is not None:
         sd = load_sft(ckpt_path, device=str(device))
