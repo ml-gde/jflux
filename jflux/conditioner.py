@@ -31,7 +31,7 @@ class HFEmbedder(nnx.Module):
 
         self.hf_module = self.hf_module.eval().requires_grad_(False)  # noqa: ignore
 
-    def forward(self, text: list[str]) -> Array:
+    def __call__(self, text: list[str]) -> Array:
         batch_encoding = self.tokenizer(
             text,
             truncation=True,
