@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import jax
 import jax.numpy as jnp
-from jax import Array
+from chex import Array
 from flax import nnx
 from einops import rearrange
 

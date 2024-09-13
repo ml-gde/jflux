@@ -4,7 +4,7 @@ from transformers import (
     FlaxT5EncoderModel,
     T5Tokenizer,
 )
-from jax import Array
+from chex import Array
 from flax import nnx
 
 

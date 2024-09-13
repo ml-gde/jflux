@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from flax import nnx
 from jax import numpy as jnp
-from jax import Array
+from chex import Array
 from jflux.layers import (
     Identity,
     Embed,

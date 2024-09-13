@@ -1,7 +1,9 @@
 import typing
 
 from einops import rearrange
-from jax import Array, numpy as jnp, nn
+from chex import Array
+import jax
+from jax import numpy as jnp
 
 
 @typing.no_type_check
@@ -11,7 +13,7 @@ def attention(q: Array, k: Array, v: Array, pe: Array) -> Array:
 
     # jax expects this shape
     x = rearrange(x, "B H L D -> B L H D")  # noqa
-    x = nn.dot_product_attention(q, k, v)
+    x = jax.nn.dot_product_attention(q, k, v)
     x = rearrange(x, "B L H D -> B L (H D)")  # reshape again
 
     return x

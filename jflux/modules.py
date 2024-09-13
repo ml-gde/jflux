@@ -1,6 +1,6 @@
 import typing
 from dataclasses import dataclass
-from jax import Array
+from chex import Array
 from flax import nnx
 import jax.numpy as jnp
 

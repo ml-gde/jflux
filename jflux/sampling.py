@@ -6,7 +6,7 @@ from einops import rearrange, repeat
 import jax
 from jax.image import ResizeMethod
 from jax import numpy as jnp
-from jax import Array
+from chex import Array
 from jflux.model import Flux
 from jflux.conditioner import HFEmbedder
 
