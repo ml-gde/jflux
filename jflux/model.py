@@ -92,7 +92,7 @@ class Flux(nnx.Module):
             self.hidden_size, 1, self.out_channels, rngs=rngs
         )
 
-    def forward(
+    def __call__(
         self,
         img: Array,
         img_ids: Array,
