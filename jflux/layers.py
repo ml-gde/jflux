@@ -206,15 +206,7 @@ class DiagonalGaussian(nnx.Module):
 
 
 class Identity(nnx.Module):
-    """
-    Identity module.
-
-    Args:
-        x (Array): Input array.
-
-    Returns:
-        Array: The input array.
-    """
+    """Identity module."""
 
     def __call__(self, x: Array) -> Array:
         return x
