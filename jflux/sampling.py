@@ -6,29 +6,40 @@ from einops import rearrange, repeat
 import jax
 from jax.image import ResizeMethod
 from jax import numpy as jnp
-from chex import Array
+from jax.typing import DTypeLike
+from chex import Array, PRNGKey, Device
 from jflux.model import Flux
 from jflux.conditioner import HFEmbedder
 
 
 def get_noise(
+    key: PRNGKey,
     num_samples: int,
     height: int,
     width: int,
-    device,
-    dtype,
-    seed: int,
-):
-    return jnp.randn(
-        num_samples,
-        16,
-        # allow for packing
-        2 * math.ceil(height / 16),
-        2 * math.ceil(width / 16),
-        device=device,
+    device: Device,
+    dtype: DTypeLike,
+) -> Array:
+    """
+    Generate noise for sampling
+
+    Args:
+        key (PRNGKey): Random key
+        num_samples (int): Number of samples
+        height (int): Height of the noise
+        width (int): Width of the noise
+        device (Device): Device to store the noise
+        dtype (DTypeLike): Data type of the noise
+
+    Returns:
+        Array: Noise tensor
+    """
+    noise = jax.random.normal(
+        key=key,
+        shape=(num_samples, 16, 2 * math.ceil(height / 16), 2 * math.ceil(width / 16)),
         dtype=dtype,
-        generator=jnp.Generator(device=device).manual_seed(seed),
     )
+    return jax.device_put(x=noise, device=device)
 
 
 def prepare(
@@ -67,13 +78,36 @@ def prepare(
     }
 
 
-def time_shift(mu: float, sigma: float, t: Array):
-    return math.exp(mu) / (math.exp(mu) + (1 / t - 1) ** sigma)
+def time_shift(mu: float, sigma: float, timesteps: Array) -> Array:
+    """
+    Shift the timesteps
+
+    Args:
+        mu (float): Estimated mu
+        sigma (float): Sigma
+        timesteps (Array): Timesteps
+
+    Returns:
+        Array: Shifted timesteps
+    """
+    return jnp.exp(mu) / (jnp.exp(mu) + (1 / timesteps - 1) ** sigma)
 
 
 def get_lin_function(
     x1: float = 256, y1: float = 0.5, x2: float = 4096, y2: float = 1.15
 ) -> Callable[[float], float]:
+    """
+    Get the linear function between two points
+
+    Args:
+        x1 (float, optional): x1. Defaults to 256.
+        y1 (float, optional): y1. Defaults to 0.5.
+        x2 (float, optional): x2. Defaults to 4096.
+        y2 (float, optional): y2. Defaults to 1.15.
+
+    Returns:
+        Callable[[float], float]: Linear function
+    """
     m = (y2 - y1) / (x2 - x1)
     b = y1 - m * x1
     return lambda x: m * x + b
@@ -86,13 +120,27 @@ def get_schedule(
     max_shift: float = 1.15,
     shift: bool = True,
 ) -> list[float]:
+    """
+    Get the schedule for the sampling
+
+    Args:
+        num_steps (int): Number of steps
+        image_seq_len (int): Length of the image sequence
+        base_shift (float, optional): Base shift. Defaults to 0.5.
+        max_shift (float, optional): Maximum shift. Defaults to 1.15.
+        shift (bool, optional): Whether to shift the schedule. Defaults to True.
+
+    Returns:
+        list[float]: Schedule for the sampling
+    """
     # extra step for zero
     timesteps = jnp.linspace(1, 0, num_steps + 1)
 
     # shifting the schedule to favor high timesteps for higher signal images
     if shift:
         # estimate mu based on linear estimation between two points
-        mu = get_lin_function(y1=base_shift, y2=max_shift)(image_seq_len)
+        lin_function = get_lin_function(y1=base_shift, y2=max_shift)
+        mu = lin_function(image_seq_len)
         timesteps = time_shift(mu, 1.0, timesteps)
 
     return timesteps.tolist()
@@ -132,6 +180,17 @@ def denoise(
 
 
 def unpack(x: Array, height: int, width: int) -> Array:
+    """
+    Unpack the image tensor
+
+    Args:
+        x (Array): Input tensor
+        height (int): Height of the image
+        width (int): Width of the image
+
+    Returns:
+        Array: Unpacked image tensor
+    """
     return rearrange(
         x,
         "b (h w) (c ph pw) -> b c (h ph) (w pw)",
