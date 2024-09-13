@@ -1,7 +1,5 @@
 import unittest
 import jax.numpy as jnp
-from jax import random
-from flax import nnx
 
 from jflux.math import attention, rope, apply_rope
 

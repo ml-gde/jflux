@@ -14,3 +14,7 @@ $ uv sync
 ```shell
 $ uv jflux
 ```
+
+## References
+
+* Original Implementation: [black-forest-labs/flux](https://github.com/black-forest-labs/flux)

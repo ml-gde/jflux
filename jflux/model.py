@@ -3,14 +3,13 @@ from dataclasses import dataclass
 from flax import nnx
 from jax import numpy as jnp
 from jax import Array
-from jflux.modules.layers import (
-    DoubleStreamBlock,
-    EmbedND,
-    LastLayer,
-    MLPEmbedder,
-    SingleStreamBlock,
+from jflux.layers import (
+    Identity,
+    Embed,
+    AdaLayerNorm,
     timestep_embedding,
 )
+from jflux.modules import DoubleStreamBlock, SingleStreamBlock, MLPEmbedder
 
 
 @dataclass
@@ -34,9 +33,7 @@ class Flux(nnx.Module):
     Transformer model for flow matching on sequences.
     """
 
-    def __init__(self, params: FluxParams):
-        super().__init__()
-
+    def __init__(self, params: FluxParams, rngs: nnx.Rngs) -> None:
         self.params = params
         self.in_channels = params.in_channels
         self.out_channels = self.in_channels
@@ -51,41 +48,49 @@ class Flux(nnx.Module):
             )
         self.hidden_size = params.hidden_size
         self.num_heads = params.num_heads
-        self.pe_embedder = EmbedND(
+        self.pe_embedder = Embed(
             dim=pe_dim, theta=params.theta, axes_dim=params.axes_dim
         )
-        self.img_in = nn.Linear(self.in_channels, self.hidden_size, bias=True)
-        self.time_in = MLPEmbedder(in_dim=256, hidden_dim=self.hidden_size)
-        self.vector_in = MLPEmbedder(params.vec_in_dim, self.hidden_size)
-        self.guidance_in = (
-            MLPEmbedder(in_dim=256, hidden_dim=self.hidden_size)
-            if params.guidance_embed
-            else nn.Identity()
+        self.img_in = nnx.Linear(
+            self.in_channels, self.hidden_size, use_bias=True, rngs=rngs
         )
-        self.txt_in = nn.Linear(params.context_in_dim, self.hidden_size)
+        self.time_in = MLPEmbedder(in_dim=256, hidden_dim=self.hidden_size, rngs=rngs)
+        self.vector_in = MLPEmbedder(params.vec_in_dim, self.hidden_size, rngs=rngs)
+        self.guidance_in = (
+            MLPEmbedder(in_dim=256, hidden_dim=self.hidden_size, rngs=rngs)
+            if params.guidance_embed
+            else Identity()
+        )
+        self.txt_in = nnx.Linear(params.context_in_dim, self.hidden_size, rngs=rngs)
 
-        self.double_blocks = nn.ModuleList(
-            [
+        self.double_blocks = nnx.Sequential(
+            *[
                 DoubleStreamBlock(
                     self.hidden_size,
                     self.num_heads,
                     mlp_ratio=params.mlp_ratio,
                     qkv_bias=params.qkv_bias,
+                    rngs=rngs,
                 )
                 for _ in range(params.depth)
             ]
         )
 
-        self.single_blocks = nn.ModuleList(
-            [
+        self.single_blocks = nnx.Sequential(
+            *[
                 SingleStreamBlock(
-                    self.hidden_size, self.num_heads, mlp_ratio=params.mlp_ratio
+                    self.hidden_size,
+                    self.num_heads,
+                    mlp_ratio=params.mlp_ratio,
+                    rngs=rngs,
                 )
                 for _ in range(params.depth_single_blocks)
             ]
         )
 
-        self.final_layer = LastLayer(self.hidden_size, 1, self.out_channels)
+        self.final_layer = AdaLayerNorm(
+            self.hidden_size, 1, self.out_channels, rngs=rngs
+        )
 
     def forward(
         self,
@@ -108,17 +113,17 @@ class Flux(nnx.Module):
                 raise ValueError(
                     "Didn't get guidance strength for guidance distilled model."
                 )
-            vec = vec + self.guidance_in(timestep_embedding(guidance, 256))
+            vec = vec + self.guidance_in(timestep_embedding(guidance, 256))  # type: ignore
         vec = vec + self.vector_in(y)
         txt = self.txt_in(txt)
 
-        ids = jnp.cat((txt_ids, img_ids), dim=1)
+        ids = jnp.concat((txt_ids, img_ids), axis=1)
         pe = self.pe_embedder(ids)
 
         for block in self.double_blocks:
             img, txt = block(img=img, txt=txt, vec=vec, pe=pe)
 
-        img = jnp.cat((txt, img), 1)
+        img = jnp.concat((txt, img), axis=1)
         for block in self.single_blocks:
             img = block(img, vec=vec, pe=pe)
         img = img[:, txt.shape[1] :, ...]

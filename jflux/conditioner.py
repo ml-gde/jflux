@@ -10,7 +10,6 @@ from flax import nnx
 
 class HFEmbedder(nnx.Module):
     def __init__(self, version: str, max_length: int, **hf_kwargs) -> None:
-        super().__init__()
         self.is_clip = version.startswith("openai")
         self.max_length = max_length
         self.output_key = "pooler_output" if self.is_clip else "last_hidden_state"
@@ -23,14 +22,14 @@ class HFEmbedder(nnx.Module):
                 version, **hf_kwargs
             )
         else:
-            self.tokenizer: T5Tokenizer = T5Tokenizer.from_pretrained(
+            self.tokenizer: T5Tokenizer = T5Tokenizer.from_pretrained(  # type: ignore
                 version, max_length=max_length
             )
-            self.hf_module: FlaxT5EncoderModel = FlaxT5EncoderModel.from_pretrained(
+            self.hf_module: FlaxT5EncoderModel = FlaxT5EncoderModel.from_pretrained(  # type: ignore
                 version, from_pt=True, **hf_kwargs
             )
 
-        self.hf_module = self.hf_module.eval().requires_grad_(False)
+        self.hf_module = self.hf_module.eval().requires_grad_(False)  # noqa: ignore
 
     def forward(self, text: list[str]) -> Array:
         batch_encoding = self.tokenizer(

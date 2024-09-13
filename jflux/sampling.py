@@ -8,7 +8,7 @@ from jax.image import ResizeMethod
 from jax import numpy as jnp
 from jax import Array
 from jflux.model import Flux
-from jflux.modules.conditioner import HFEmbedder
+from jflux.conditioner import HFEmbedder
 
 
 def get_noise(
@@ -49,12 +49,12 @@ def prepare(
 
     if isinstance(prompt, str):
         prompt = [prompt]
-    txt = t5(prompt)
+    txt = t5(prompt)  # noqa: ignore
     if txt.shape[0] == 1 and bs > 1:
         txt = repeat(txt, "1 ... -> bs ...", bs=bs)
     txt_ids = jnp.zeros(bs, txt.shape[1], 3)
 
-    vec = clip(prompt)
+    vec = clip(prompt)  # noqa: ignore
     if vec.shape[0] == 1 and bs > 1:
         vec = repeat(vec, "1 ... -> bs ...", bs=bs)
 
@@ -143,12 +143,24 @@ def unpack(x: Array, height: int, width: int) -> Array:
 
 
 def interpolate(x: Array, scale_factor: float, method: str | ResizeMethod) -> Array:
+    """
+    Native JAX implementation of interpolate from `torch.nn.functional.interpolate`
+
+    Args:
+        x (Array): Input tensor
+        scale_factor (float): Scaling factor
+        method (str | ResizeMethod): Interpolation method
+
+    Returns:
+        Array: Resized tensor using the specified method
+    """
     if isinstance(scale_factor, (int, float)):
-        scale_factor = (scale_factor, scale_factor)
+        scale_factor = (scale_factor, scale_factor)  # type: ignore
 
     input_shape = x.shape
     new_shape = tuple(
-        int(dim * factor) for dim, factor in zip(input_shape[-2:], scale_factor)
+        int(dim * factor)
+        for dim, factor in zip(input_shape[-2:], scale_factor)  # type: ignore
     )
 
     return jax.image.resize(x, x.shape[:-2] + new_shape, method=method)

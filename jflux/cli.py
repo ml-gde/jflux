@@ -6,10 +6,8 @@ from glob import iglob
 
 from einops import rearrange
 from fire import Fire
-from PIL import ExifTags, Image
 
 import jax
-from flax import nnx
 from jflux.sampling import denoise, get_noise, get_schedule, prepare, unpack
 from jflux.util import (
     configs,
@@ -18,8 +16,6 @@ from jflux.util import (
     load_flow_model,
     load_t5,
 )
-
-NSFW_THRESHOLD = 0.85
 
 
 @dataclass
@@ -30,6 +26,75 @@ class SamplingOptions:
     num_steps: int
     guidance: float
     seed: int | None
+
+
+def parse_prompt(options: SamplingOptions) -> SamplingOptions | None:
+    user_question = (
+        "Next prompt (write /h for help, /q to quit and leave empty to repeat):\n"
+    )
+    usage = (
+        "Usage: Either write your prompt directly, leave this field empty "
+        "to repeat the prompt or write a command starting with a slash:\n"
+        "- '/w <width>' will set the width of the generated image\n"
+        "- '/h <height>' will set the height of the generated image\n"
+        "- '/s <seed>' sets the next seed\n"
+        "- '/g <guidance>' sets the guidance (flux-dev only)\n"
+        "- '/n <steps>' sets the number of steps\n"
+        "- '/q' to quit"
+    )
+
+    while (prompt := input(user_question)).startswith("/"):
+        if prompt.startswith("/w"):
+            if prompt.count(" ") != 1:
+                print(f"Got invalid command '{prompt}'\n{usage}")
+                continue
+            _, width = prompt.split()
+            options.width = 16 * (int(width) // 16)
+            print(
+                f"Setting resolution to {options.width} x {options.height} "
+                f"({options.height *options.width/1e6:.2f}MP)"
+            )
+        elif prompt.startswith("/h"):
+            if prompt.count(" ") != 1:
+                print(f"Got invalid command '{prompt}'\n{usage}")
+                continue
+            _, height = prompt.split()
+            options.height = 16 * (int(height) // 16)
+            print(
+                f"Setting resolution to {options.width} x {options.height} "
+                f"({options.height *options.width/1e6:.2f}MP)"
+            )
+        elif prompt.startswith("/g"):
+            if prompt.count(" ") != 1:
+                print(f"Got invalid command '{prompt}'\n{usage}")
+                continue
+            _, guidance = prompt.split()
+            options.guidance = float(guidance)
+            print(f"Setting guidance to {options.guidance}")
+        elif prompt.startswith("/s"):
+            if prompt.count(" ") != 1:
+                print(f"Got invalid command '{prompt}'\n{usage}")
+                continue
+            _, seed = prompt.split()
+            options.seed = int(seed)
+            print(f"Setting seed to {options.seed}")
+        elif prompt.startswith("/n"):
+            if prompt.count(" ") != 1:
+                print(f"Got invalid command '{prompt}'\n{usage}")
+                continue
+            _, steps = prompt.split()
+            options.num_steps = int(steps)
+            print(f"Setting seed to {options.num_steps}")
+        elif prompt.startswith("/q"):
+            print("Quitting")
+            return None
+        else:
+            if not prompt.startswith("/h"):
+                print(f"Got invalid command '{prompt}'\n{usage}")
+            print(usage)
+    if prompt != "":
+        options.prompt = prompt
+    return options
 
 
 def main(
@@ -170,14 +235,13 @@ def main(
 
     # decode latents to pixel space
     x = unpack(x.float(), opts.height, opts.width)
-    with torch.autocast(device_type=torch_device.type, dtype=torch.bfloat16):
-        x = ae.decode(x)
+    x = ae.decode(x).astype(dtype=jax.dtypes.bfloat16)
     t1 = time.perf_counter()
 
     fn = output_name.format(idx=idx)
     print(f"Done in {t1 - t0:.1f}s. Saving {fn}")
     # bring into PIL format and save
-    x = x.clamp(-1, 1)
+    x = jax.lax.clamp(min=-1, x=x, max=1)
     x = rearrange(x[0], "c h w -> h w c")
 
     if loop:

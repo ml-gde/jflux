@@ -6,8 +6,8 @@ from huggingface_hub import hf_hub_download
 from safetensors.numpy import load_file as load_sft
 
 from jflux.model import Flux, FluxParams
-from jflux.modules.autoencoder import AutoEncoder, AutoEncoderParams
-from jflux.modules.conditioner import HFEmbedder
+from jflux.autoencoder import AutoEncoder, AutoEncoderParams
+from jflux.conditioner import HFEmbedder
 
 
 @dataclass
@@ -113,7 +113,7 @@ def load_flow_model(name: str, device="cuda", hf_download: bool = True):
         ckpt_path = hf_hub_download(configs[name].repo_id, configs[name].repo_flow)
 
     with jnp.device("meta" if ckpt_path is not None else device):
-        model = Flux(configs[name].params).to(jnp.bfloat16)
+        model = Flux(configs[name].params).to(jnp.bfloat16)  # type: ignore
 
     if ckpt_path is not None:
         print("Loading checkpoint")
@@ -150,7 +150,7 @@ def load_ae(name: str, device="cuda", hf_download: bool = True) -> AutoEncoder:
     # Loading the autoencoder
     print("Init AE")
     with jnp.device("meta" if ckpt_path is not None else device):
-        ae = AutoEncoder(configs[name].ae_params)
+        ae = AutoEncoder(configs[name].ae_params)  # type: ignore
 
     if ckpt_path is not None:
         sd = load_sft(ckpt_path, device=str(device))
