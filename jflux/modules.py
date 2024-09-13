@@ -85,7 +85,7 @@ class SelfAttention(nnx.Module):
             dtype=dtype,
             param_dtype=param_dtype,
         )
-        self.norm = QKNorm(head_dim, rngs=rngs)
+        self.norm = QKNorm(head_dim, rngs=rngs, dtype=dtype, param_dtype=param_dtype)
         self.proj = nnx.Linear(
             in_features=dim,
             out_features=dim,
