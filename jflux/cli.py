@@ -4,7 +4,6 @@ import time
 from dataclasses import dataclass
 from glob import iglob
 
-from einops import rearrange
 from fire import Fire
 
 import jax
@@ -113,24 +112,22 @@ def main(
     # TODO: JAX variant of offloading to CPU
     offload: bool = False,
     output_dir: str = "output",
-    add_sampling_metadata: bool = True,
-):
+) -> None:
     """
     Sample the flux model.
 
     Args:
-        name: Name of the model to load
-        height: height of the sample in pixels (should be a multiple of 16)
-        width: width of the sample in pixels (should be a multiple of 16)
-        seed: Set a seed for sampling
-        output_name: where to save the output image, `{idx}` will be replaced
-            by the index of the sample
-        prompt: Prompt used for sampling
-        device: Pytorch device
-        num_steps: number of sampling steps (default 4 for schnell, 50 for guidance distilled)
-        loop: start an interactive session and sample multiple times
-        guidance: guidance value used for guidance distillation
-        add_sampling_metadata: Add the prompt to the image Exif metadata
+        name(str): Name of the model to use. Choose from 'flux-schnell' or 'flux-dev'.
+        width(int): Width of the generated image.
+        height(int): Height of the generated image.
+        seed(int, optional): Seed for the random number generator.
+        prompt(str): Text prompt to generate the image from.
+        device(str): Device to run the model on. Choose from 'cpu' or 'gpu'.
+        num_steps(int, optional): Number of steps to run the model for.
+        loop(bool): Whether to loop the sampling process.
+        guidance(float, optional): Guidance for the model, defaults to 3.5.
+        offload(bool, optional): Whether to offload the model to CPU, defaults to False.
+        output_dir(str, optional): Directory to save the output images in, defaults to 'output'.
     """
 
     if name not in configs:
@@ -188,67 +185,65 @@ def main(
         seed=seed,
     )
 
-    if opts.seed is None:
-        # TODO (ariG23498)
-        # set the rng seed
-        # opts.seed = rng.seed()
-        pass
-    print(f"Generating with seed {opts.seed}:\n{opts.prompt}")
-    t0 = time.perf_counter()
+    while opts is not None:
+        if opts.seed is None:
+            # TODO (ariG23498)
+            # set the rng seed
+            # opts.seed = rng.seed()
+            pass
+        print(f"Generating with seed {opts.seed}:\n{opts.prompt}")
+        t0 = time.perf_counter()
 
-    # prepare input
-    x = get_noise(
-        1,
-        opts.height,
-        opts.width,
-        device=jax_device,
-        dtype=jax.dtypes.bfloat16,
-        seed=opts.seed,
-    )
-    opts.seed = None
-    # TODO: JAX variant of offloading to CPU
-    # if offload:
-    #     ae = ae.cpu()
-    #     torch.cuda.empty_cache()
-    #     t5, clip = t5.to(torch_device), clip.to(torch_device)
-    inp = prepare(t5, clip, x, prompt=opts.prompt)
-    timesteps = get_schedule(
-        opts.num_steps, inp["img"].shape[1], shift=(name != "flux-schnell")
-    )
+        # prepare input
+        x = get_noise(
+            1,
+            opts.height,
+            opts.width,
+            device=jax_device,
+            dtype=jax.dtypes.bfloat16,
+            seed=opts.seed,  # type: ignore
+        )
+        opts.seed = None
+        # TODO: JAX variant of offloading to CPU
+        # if offload:
+        #     ae = ae.cpu()
+        #     torch.cuda.empty_cache()
+        #     t5, clip = t5.to(torch_device), clip.to(torch_device)
+        inp = prepare(t5, clip, x, prompt=opts.prompt)
+        timesteps = get_schedule(
+            opts.num_steps, inp["img"].shape[1], shift=(name != "flux-schnell")
+        )
 
-    # offload TEs to CPU, load model to gpu
-    # TODO: JAX variant of offloading to CPU
-    # if offload:
-    #     t5, clip = t5.cpu(), clip.cpu()
-    #     torch.cuda.empty_cache()
-    #     model = model.to(torch_device)
+        # offload TEs to CPU, load model to gpu
+        # TODO: JAX variant of offloading to CPU
+        # if offload:
+        #     t5, clip = t5.cpu(), clip.cpu()
+        #     torch.cuda.empty_cache()
+        #     model = model.to(torch_device)
 
-    # denoise initial noise
-    x = denoise(model, **inp, timesteps=timesteps, guidance=opts.guidance)
+        # denoise initial noise
+        x = denoise(model, **inp, timesteps=timesteps, guidance=opts.guidance)
 
-    # offload model, load autoencoder to gpu
-    # TODO: JAX variant of offloading to CPU
-    # if offload:
-    #     model.cpu()
-    #     torch.cuda.empty_cache()
-    #     ae.decoder.to(x.device)
+        # offload model, load autoencoder to gpu
+        # TODO: JAX variant of offloading to CPU
+        # if offload:
+        #     model.cpu()
+        #     torch.cuda.empty_cache()
+        #     ae.decoder.to(x.device)
 
-    # decode latents to pixel space
-    x = unpack(x.float(), opts.height, opts.width)
-    x = ae.decode(x).astype(dtype=jax.dtypes.bfloat16)
-    t1 = time.perf_counter()
+        # decode latents to pixel space
+        x = unpack(x.float(), opts.height, opts.width)
+        x = ae.decode(x).astype(dtype=jax.dtypes.bfloat16)  # noqa
+        t1 = time.perf_counter()
 
-    fn = output_name.format(idx=idx)
-    print(f"Done in {t1 - t0:.1f}s. Saving {fn}")
-    # bring into PIL format and save
-    x = jax.lax.clamp(min=-1, x=x, max=1)
-    x = rearrange(x[0], "c h w -> h w c")
+        fn = output_name.format(idx=idx)
+        print(f"Done in {t1 - t0:.1f}s. Saving {fn}")
 
-    if loop:
-        print("-" * 80)
-        opts = parse_prompt(opts)
-    else:
-        opts = None
+        if loop:
+            print("-" * 80)
+            opts = parse_prompt(opts)
+        else:
+            opts = None
 
 
 def app():
