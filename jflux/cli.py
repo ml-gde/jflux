@@ -209,7 +209,7 @@ def main(
         #     ae = ae.cpu()
         #     torch.cuda.empty_cache()
         #     t5, clip = t5.to(torch_device), clip.to(torch_device)
-        inp = prepare(t5, clip, x, prompt=opts.prompt)
+        inp = prepare(t5, clip, img=x, prompt=opts.prompt, device=jax_device)
         timesteps = get_schedule(
             opts.num_steps, inp["img"].shape[1], shift=(name != "flux-schnell")
         )

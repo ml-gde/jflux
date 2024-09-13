@@ -43,38 +43,64 @@ def get_noise(
 
 
 def prepare(
-    t5: HFEmbedder, clip: HFEmbedder, img: Array, prompt: str | list[str]
+    t5: HFEmbedder,
+    clip: HFEmbedder,
+    img: Array,
+    prompt: str | list[str],
+    device: Device,
 ) -> dict[str, Array]:
+    """
+    Prepare the input for the sampling
+
+    Args:
+        t5 (HFEmbedder): T5 embedder
+        clip (HFEmbedder): CLIP embedder
+        img (Array): Image tensor
+        prompt (str | list[str]): Prompt for the sampling
+        device (Device): Device to store the input
+
+    Returns:
+        dict[str, Array]: Prepared input
+    """
+    # prepare prompt
+    if isinstance(prompt, str):
+        prompt = [prompt]
+
+    # determine batch size
     bs, c, h, w = img.shape
     if bs == 1 and not isinstance(prompt, str):
         bs = len(prompt)
 
+    # prepare image
     img = rearrange(img, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=2, pw=2)
     if img.shape[0] == 1 and bs > 1:
         img = repeat(img, "1 ... -> bs ...", bs=bs)
 
-    img_ids = jnp.zeros(h // 2, w // 2, 3)
+    # prepare image ids
+    img_ids = jnp.zeros(shape=(h // 2, w // 2), device=device)
     img_ids[..., 1] = img_ids[..., 1] + jnp.arange(h // 2)[:, None]
     img_ids[..., 2] = img_ids[..., 2] + jnp.arange(w // 2)[None, :]
     img_ids = repeat(img_ids, "h w c -> b (h w) c", b=bs)
 
-    if isinstance(prompt, str):
-        prompt = [prompt]
-    txt = t5(prompt)  # noqa: ignore
+    # prepare txt
+    txt = t5(prompt)
     if txt.shape[0] == 1 and bs > 1:
         txt = repeat(txt, "1 ... -> bs ...", bs=bs)
-    txt_ids = jnp.zeros(bs, txt.shape[1], 3)
 
-    vec = clip(prompt)  # noqa: ignore
+    # prepare txt ids
+    txt_ids = jnp.zeros(shape=(bs, txt.shape[0]), device=device)
+
+    # prepare vec
+    vec = clip(prompt)
     if vec.shape[0] == 1 and bs > 1:
         vec = repeat(vec, "1 ... -> bs ...", bs=bs)
 
     return {
-        "img": img,
-        "img_ids": img_ids.to(img.device),
-        "txt": txt.to(img.device),
-        "txt_ids": txt_ids.to(img.device),
-        "vec": vec.to(img.device),
+        "img": jax.device_put(img, device=device),
+        "img_ids": jax.device_put(img_ids, device=device),
+        "txt": jax.device_put(txt, device=device),
+        "txt_ids": jax.device_put(txt_ids, device=device),
+        "vec": jax.device_put(vec, device=device),
     }
 
 
