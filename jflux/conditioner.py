@@ -39,7 +39,7 @@ class HFEmbedder(nnx.Module):
             return_length=False,
             return_overflowing_tokens=False,
             padding="max_length",
-            return_tensors="pt",
+            return_tensors="np",
         )
 
         outputs = self.hf_module(
