@@ -21,6 +21,5 @@ test:
 
 # Basic linting
 lint:
-  black src
-  ruff check src
-  mypy src
+  ruff check jflux
+  mypy jflux
