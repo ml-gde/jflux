@@ -96,11 +96,11 @@ def prepare(
         vec = repeat(vec, "1 ... -> bs ...", bs=bs)
 
     return {
-        "img": jax.device_put(img, device=device),
-        "img_ids": jax.device_put(img_ids, device=device),
-        "txt": jax.device_put(txt, device=device),
-        "txt_ids": jax.device_put(txt_ids, device=device),
-        "vec": jax.device_put(vec, device=device),
+        "img": img.to_device(device, stream=None),
+        "img_ids": img_ids.to_device(device, stream=None),
+        "txt": txt.to_device(device, stream=None),
+        "txt_ids": txt_ids.to_device(device, stream=None),
+        "vec": vec.to_device(device, stream=None),
     }
 
 
