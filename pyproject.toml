@@ -25,6 +25,9 @@ jflux = "jflux.cli:app"
 [tool.uv.sources]
 flux-jax = { workspace = true }
 
+[tool.mypy]
+disable_error_code = "no-redef"
+
 [tool.pytest.ini_options]
 pythonpath = "."
 testpaths = ["tests"]

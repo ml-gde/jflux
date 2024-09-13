@@ -22,10 +22,10 @@ class HFEmbedder(nnx.Module):
                 version, **hf_kwargs
             )
         else:
-            self.tokenizer: T5Tokenizer = T5Tokenizer.from_pretrained(  # type: ignore
+            self.tokenizer: T5Tokenizer = T5Tokenizer.from_pretrained(
                 version, max_length=max_length
             )
-            self.hf_module: FlaxT5EncoderModel = FlaxT5EncoderModel.from_pretrained(  # type: ignore
+            self.hf_module: FlaxT5EncoderModel = FlaxT5EncoderModel.from_pretrained(
                 version, from_pt=True, **hf_kwargs
             )
 
