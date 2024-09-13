@@ -29,24 +29,22 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v2
         with:
-          python-version: ${{ matrix.python-version }}
-          cache: "pip"
-          cache-dependency-path: ".devcontainer/requirements.txt"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: |
-          python -m venv .venv && export PATH=".venv/bin:$PATH"
-          python -m pip install uv
-          python -m uv pip install --upgrade wheel setuptools
-          python -m uv pip install -r .devcontainer/requirements.txt
+        run: uv sync --all-extras --dev
+
       - name: Ruff
         run: |
-          python -m venv .venv && export PATH=".venv/bin:$PATH"
-          python -m ruff check src
+          uv run ruff check jflux
       - name: Test with PyTest
         run: |
-          python -m venv .venv && export PATH=".venv/bin:$PATH"
-          python -m pytest -v .
+          uv run pytest -v .
