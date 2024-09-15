@@ -14,13 +14,18 @@ dependencies = [
     "jax>=0.4.31",
     "mypy>=1.11.2",
     "pillow>=10.4.0",
-    "pytest>=8.3.2",
     "ruff>=0.6.3",
     "transformers>=4.44.2",
 ]
 
 [project.scripts]
 jflux = "jflux.cli:app"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.3.3",
+    "torch>=2.4.1",
+]
 
 [tool.uv.sources]
 flux-jax = { workspace = true }
