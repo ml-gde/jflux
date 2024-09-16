@@ -21,5 +21,8 @@ test:
 
 # Basic linting
 lint:
-  ruff check jflux --fix
+  ruff check jflux tests --fix
+
+# Type checking
+typecheck:
   mypy jflux

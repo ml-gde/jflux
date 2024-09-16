@@ -116,7 +116,7 @@ class QKNorm(nnx.Module):
     def __call__(self, q: Array, k: Array, v: Array) -> tuple[Array, Array]:
         q = self.query_norm(q)
         k = self.key_norm(k)
-        return q.astype(v.device()), k.astype(v.device())
+        return q.to_device(v.device), k.to_device(v.device)
 
 
 class AdaLayerNorm(nnx.Module):
@@ -171,7 +171,8 @@ class AdaLayerNorm(nnx.Module):
         )
 
     def __call__(self, x: Array, vec: Array) -> Array:
-        shift, scale = self.adaLN_modulation(vec).chunk(2, dim=1)
+        modulation_output = self.adaLN_modulation(vec)
+        shift, scale = jnp.split(modulation_output, indices_or_sections=2, axis=1)
         x = (1 + scale[:, None, :]) * self.norm_final(x) + shift[:, None, :]
         x = self.linear(x)
         return x

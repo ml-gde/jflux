@@ -1,8 +1,9 @@
 import unittest
-import pytest
-import jax.numpy as jnp
 
-from jflux.math import attention, rope, apply_rope
+import jax.numpy as jnp
+import pytest
+
+from jflux.math import apply_rope, attention, rope
 
 
 class TestAttentionMechanism(unittest.TestCase):
