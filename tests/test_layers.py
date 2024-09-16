@@ -1,42 +1,9 @@
 import chex
 import jax.numpy as jnp
-import torch.nn as nn
 import torch
-from einops import rearrange
 
+from flux.modules.layers import EmbedND
 from jflux.layers import Embed
-
-
-def torch_rope(pos, dim: int, theta: int):
-    assert dim % 2 == 0
-    scale = torch.arange(0, dim, 2, dtype=torch.float64, device=pos.device) / dim
-    omega = 1.0 / (theta**scale)
-    out = torch.einsum("...n,d->...nd", pos, omega)
-    out = torch.stack(
-        [torch.cos(out), -torch.sin(out), torch.sin(out), torch.cos(out)], dim=-1
-    )
-    out = rearrange(out, "b n d (i j) -> b n d i j", i=2, j=2)
-    return out.float()
-
-
-class EmbedND(nn.Module):
-    def __init__(self, dim: int, theta: int, axes_dim: list[int]):
-        super().__init__()
-        self.dim = dim
-        self.theta = theta
-        self.axes_dim = axes_dim
-
-    def forward(self, ids):
-        n_axes = ids.shape[-1]
-        emb = torch.cat(
-            [
-                torch_rope(ids[..., i], self.axes_dim[i], self.theta)
-                for i in range(n_axes)
-            ],
-            dim=-3,
-        )
-
-        return emb.unsqueeze(1)
 
 
 class EmbedTestCase(chex.TestCase):
