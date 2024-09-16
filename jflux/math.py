@@ -1,8 +1,8 @@
 import typing
 
-from einops import rearrange
-from chex import Array
 import jax
+from chex import Array
+from einops import rearrange
 from jax import numpy as jnp
 
 

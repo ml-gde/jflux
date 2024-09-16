@@ -4,11 +4,11 @@ import time
 from dataclasses import dataclass
 from glob import iglob
 
-from fire import Fire
-
 import jax
 import jax.numpy as jnp
+from fire import Fire
 from jax.typing import DTypeLike
+
 from jflux.sampling import denoise, get_noise, get_schedule, prepare, unpack
 from jflux.util import (
     configs,

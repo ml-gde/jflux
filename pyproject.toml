@@ -31,6 +31,12 @@ dev-dependencies = [
 flux-jax = { workspace = true }
 flux = { git = "https://github.com/black-forest-labs/flux.git" }
 
+[tool.ruff.lint]
+select = ["I001"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
 [tool.mypy]
 disable_error_code = "no-redef"
 

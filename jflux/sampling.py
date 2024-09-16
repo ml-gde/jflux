@@ -1,15 +1,15 @@
 import math
 from typing import Callable
 
-from einops import rearrange, repeat
-
 import jax
-from jax.image import ResizeMethod
+from chex import Array, Device, PRNGKey
+from einops import rearrange, repeat
 from jax import numpy as jnp
+from jax.image import ResizeMethod
 from jax.typing import DTypeLike
-from chex import Array, PRNGKey, Device
-from jflux.model import Flux
+
 from jflux.conditioner import HFEmbedder
+from jflux.model import Flux
 
 
 def get_noise(

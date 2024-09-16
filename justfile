@@ -21,5 +21,5 @@ test:
 
 # Basic linting
 lint:
-  ruff check jflux
+  ruff check jflux --fix
   mypy jflux

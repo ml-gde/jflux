@@ -2,10 +2,10 @@ from dataclasses import dataclass
 
 import jax
 import jax.numpy as jnp
-from jax.typing import DTypeLike
 from chex import Array
-from flax import nnx
 from einops import rearrange
+from flax import nnx
+from jax.typing import DTypeLike
 
 from jflux.layers import DiagonalGaussian
 from jflux.sampling import interpolate

@@ -1,11 +1,11 @@
 import math
+from functools import partial
 
 import jax
 import jax.numpy as jnp
-from jax.typing import DTypeLike
 from chex import Array
 from flax import nnx
-from functools import partial
+from jax.typing import DTypeLike
 
 from jflux.math import rope
 

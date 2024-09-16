@@ -2,15 +2,15 @@ import os
 from dataclasses import dataclass
 
 import jax
-from jax.typing import DTypeLike
 from flax import nnx
-from jax import numpy as jnp
 from huggingface_hub import hf_hub_download
+from jax import numpy as jnp
+from jax.typing import DTypeLike
 from safetensors.numpy import load_file as load_sft
 
-from jflux.model import Flux, FluxParams
 from jflux.autoencoder import AutoEncoder, AutoEncoderParams
 from jflux.conditioner import HFEmbedder
+from jflux.model import Flux, FluxParams
 
 
 @dataclass

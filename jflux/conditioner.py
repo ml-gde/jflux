@@ -1,11 +1,11 @@
+from chex import Array
+from flax import nnx
 from transformers import (
-    FlaxCLIPTextModel,
     CLIPTokenizer,
+    FlaxCLIPTextModel,
     FlaxT5EncoderModel,
     T5Tokenizer,
 )
-from chex import Array
-from flax import nnx
 
 
 class HFEmbedder(nnx.Module):

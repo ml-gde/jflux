@@ -1,14 +1,15 @@
 import typing
 from dataclasses import dataclass
-from chex import Array
-from flax import nnx
+
 import jax
 import jax.numpy as jnp
+from chex import Array
+from einops import rearrange
+from flax import nnx
 from jax.typing import DTypeLike
 
-from einops import rearrange
-from jflux.math import attention
 from jflux.layers import QKNorm
+from jflux.math import attention
 
 
 class MLPEmbedder(nnx.Module):
@@ -31,6 +32,9 @@ class MLPEmbedder(nnx.Module):
         dtype: DTypeLike = jax.dtypes.bfloat16,
         param_dtype: DTypeLike = None,
     ) -> None:
+        if param_dtype is None:
+            param_dtype = dtype
+
         self.in_layer = nnx.Linear(
             in_features=in_dim,
             out_features=hidden_dim,
@@ -40,7 +44,7 @@ class MLPEmbedder(nnx.Module):
             rngs=rngs,
         )
         self.out_layer = nnx.Linear(
-            in_features=in_dim,
+            in_features=hidden_dim,
             out_features=hidden_dim,
             dtype=dtype,
             param_dtype=param_dtype,

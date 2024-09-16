@@ -1,17 +1,18 @@
 from dataclasses import dataclass
 
 import jax.dtypes
+from chex import Array
 from flax import nnx
 from jax import numpy as jnp
-from chex import Array
 from jax.typing import DTypeLike
+
 from jflux.layers import (
-    Identity,
-    Embed,
     AdaLayerNorm,
+    Embed,
+    Identity,
     timestep_embedding,
 )
-from jflux.modules import DoubleStreamBlock, SingleStreamBlock, MLPEmbedder
+from jflux.modules import DoubleStreamBlock, MLPEmbedder, SingleStreamBlock
 
 
 @dataclass
