@@ -7,11 +7,13 @@ from flux.modules.autoencoder import AttnBlock as TorchAttnBlock
 from flux.modules.autoencoder import ResnetBlock as TorchResnetBlock
 from flux.modules.autoencoder import Downsample as TorchDownsample
 from flux.modules.autoencoder import Upsample as TorchUpsample
+from flux.modules.autoencoder import Encoder as TorchEncoder
 
 from jflux.modules.autoencoder import AttnBlock as JaxAttnBlock
 from jflux.modules.autoencoder import ResnetBlock as JaxResnetBlock
 from jflux.modules.autoencoder import Downsample as JaxDownsample
 from jflux.modules.autoencoder import Upsample as JaxUpsample
+from jflux.modules.autoencoder import Encoder as JaxEncoder
 
 import numpy as np
 from tests.utils import torch2jax
@@ -97,6 +99,93 @@ def port_upsample(jax_upsample: JaxUpsample, torch_upsample: TorchUpsample):
     return jax_upsample
 
 
+def port_encoder(jax_encoder: JaxEncoder, torch_encoder: TorchEncoder):
+    # port downsampling
+    jax_conv_in = jax_encoder.conv_in
+    torch_conv_in = torch_encoder.conv_in
+
+    jax_conv_in.kernel.value = torch2jax(
+        rearrange(torch_conv_in.weight, "i o k1 k2 -> k1 k2 o i")
+    )
+    jax_conv_in.bias.value = torch2jax(torch_conv_in.bias)
+
+    # down
+    jax_down = jax_encoder.down
+    torch_down = torch_encoder.down
+
+    for i in range(len(jax_down.layers)):
+        # block
+        jax_block = jax_down.layers[i].block
+        torch_block = torch_down[i].block
+        for j in range(len(jax_block.layers)):
+            jax_resnet_block = jax_block.layers[j]
+            torch_resnet_block = torch_block[j]
+            jax_resnet_block = port_resent_block(
+                jax_resnet_block=jax_resnet_block, torch_resnet_block=torch_resnet_block
+            )
+
+        # attn
+        jax_attn = jax_down.layers[i].attn
+        torch_attn = torch_down[i].attn
+        for j in range(len(jax_attn.layers)):
+            jax_attn_block = jax_attn.layers[j]
+            torch_attn_block = torch_attn[j]
+            jax_attn_block = port_attn_block(
+                jax_attn_block=jax_attn_block, torch_attn_block=torch_attn_block
+            )
+
+        # downsample
+        if i != jax_encoder.num_resolutions - 1:
+            jax_downsample = jax_down.layers[i].downsample
+            torch_downsample = torch_down[i].downsample
+            jax_downsample = port_downsample(
+                jax_downsample=jax_downsample, torch_downsample=torch_downsample
+            )
+
+    # mid
+    jax_mid = jax_encoder.mid
+    torch_mid = torch_encoder.mid
+
+    jax_mid_block_1 = jax_mid.block_1
+    torch_mid_block_1 = torch_mid.block_1
+
+    jax_mid_block_1 = port_resent_block(
+        jax_resnet_block=jax_mid_block_1, torch_resnet_block=torch_mid_block_1
+    )
+
+    jax_mid_attn_1 = jax_mid.attn_1
+    torch_mid_attn_1 = torch_mid.attn_1
+
+    jax_mid_attn_1 = port_attn_block(
+        jax_attn_block=jax_mid_attn_1, torch_attn_block=torch_mid_attn_1
+    )
+
+    jax_mid_block_2 = jax_mid.block_2
+    torch_mid_block_2 = torch_mid.block_2
+
+    jax_mid_block_2 = port_resent_block(
+        jax_resnet_block=jax_mid_block_2, torch_resnet_block=torch_mid_block_2
+    )
+
+    # norm out
+    jax_norm_out = jax_encoder.norm_out
+    torch_norm_out = torch_encoder.norm_out
+
+    jax_norm_out.scale.value = torch2jax(torch_norm_out.weight)
+    jax_norm_out.bias.value = torch2jax(torch_norm_out.bias)
+
+    # conv out
+    jax_conv_out = jax_encoder.conv_out
+    torch_conv_out = torch_encoder.conv_out
+
+    jax_conv_out.kernel.value = torch2jax(
+        rearrange(torch_conv_out.weight, "i o k1 k2 -> k1 k2 o i")
+    )
+    jax_conv_out.bias.value = torch2jax(torch_conv_out.bias)
+
+    return jax_encoder
+
+
 class AutoEncodersTestCase(np.testing.TestCase):
     def test_attn_block(self):
         # Initialize layers
@@ -129,8 +218,8 @@ class AutoEncodersTestCase(np.testing.TestCase):
         np.testing.assert_allclose(
             np.array(rearrange(jax_output, "b h w c -> b c h w")),
             torch_output.detach().numpy(),
-            rtol=1e-3,
-            atol=1e-3,
+            rtol=1e-5,
+            atol=1e-5,
         )
 
     def test_resnet_block(self):
@@ -170,8 +259,8 @@ class AutoEncodersTestCase(np.testing.TestCase):
         np.testing.assert_allclose(
             np.array(rearrange(jax_output, "b h w c -> b c h w")),
             torch_output.detach().numpy(),
-            rtol=1e-3,
-            atol=1e-3,
+            rtol=1e-5,
+            atol=1e-5,
         )
 
     def test_downsample(self):
@@ -207,8 +296,8 @@ class AutoEncodersTestCase(np.testing.TestCase):
         np.testing.assert_allclose(
             np.array(rearrange(jax_output, "b h w c -> b c h w")),
             torch_output.detach().numpy(),
-            rtol=1e-3,
-            atol=1e-3,
+            rtol=1e-5,
+            atol=1e-5,
         )
 
     def test_upsample(self):
@@ -244,6 +333,58 @@ class AutoEncodersTestCase(np.testing.TestCase):
         np.testing.assert_allclose(
             np.array(rearrange(jax_output, "b h w c -> b c h w")),
             torch_output.detach().numpy(),
-            rtol=1e-3,
-            atol=1e-3,
+            rtol=1e-5,
+            atol=1e-5,
+        )
+
+    def test_encoder(self):
+        # Initialize encoder
+        resolution = 16
+        in_channels = 32
+        ch = 32
+        ch_mult = [2, 4]
+        num_res_blocks = 2
+        z_channels = 64
+        param_dtype = jnp.float32
+        rngs = nnx.Rngs(default=42)
+
+        torch_encoder = TorchEncoder(
+            resolution=resolution,
+            in_channels=in_channels,
+            ch=ch,
+            ch_mult=ch_mult,
+            num_res_blocks=num_res_blocks,
+            z_channels=z_channels,
+        )
+        jax_encoder = JaxEncoder(
+            resolution=resolution,
+            in_channels=in_channels,
+            ch=ch,
+            ch_mult=ch_mult,
+            num_res_blocks=num_res_blocks,
+            z_channels=z_channels,
+            rngs=rngs,
+            param_dtype=param_dtype,
+        )
+
+        # port the weights of the torch model into jax
+        jax_encoder = port_encoder(jax_encoder=jax_encoder, torch_encoder=torch_encoder)
+
+        # Generate random inputs
+        np_input = np.random.randn(2, 32, 16, 16).astype(np.float32)
+        jax_input = jnp.array(np_input, dtype=jnp.float32)
+        torch_input = torch.from_numpy(np_input).to(torch.float32)
+
+        np.testing.assert_allclose(np.array(jax_input), torch_input.numpy())
+
+        # Forward pass
+        torch_output = torch_encoder(torch_input)
+        jax_output = jax_encoder(rearrange(jax_input, "b c h w -> b h w c"))
+
+        # Assertions
+        np.testing.assert_allclose(
+            np.array(rearrange(jax_output, "b h w c -> b c h w")),
+            torch_output.detach().numpy(),
+            rtol=1e-5,
+            atol=1e-5,
         )

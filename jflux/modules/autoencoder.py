@@ -32,6 +32,8 @@ class AttnBlock(nnx.Module):
         rngs: nnx.Rngs,
         param_dtype: DTypeLike = jax.dtypes.bfloat16,
     ) -> None:
+        self.in_channels = in_channels
+
         self.norm = nnx.GroupNorm(
             num_groups=32,
             num_features=in_channels,
@@ -70,14 +72,11 @@ class AttnBlock(nnx.Module):
         )
 
     def attention(self, h_: Array) -> Array:
-        # Apply Group Norm
         h_ = self.norm(h_)
-        # Calculate Query, Key and Values
         q = self.q(h_)
         k = self.k(h_)
         v = self.v(h_)
 
-        # Reshape for JAX Attention impl
         b, h, w, c = q.shape
         q = rearrange(q, "b h w c-> b (h w) 1 c")
         k = rearrange(k, "b h w c-> b (h w) 1 c")
@@ -213,27 +212,12 @@ class Upsample(nnx.Module):
         new_shape = (b, new_height, new_width, c)
 
         # Resize using nearest-neighbor interpolation
-        x = jax.image.resize(x, new_shape, method='nearest')
+        x = jax.image.resize(x, new_shape, method="nearest")
         x = self.conv(x)
         return x
 
 
 class Encoder(nnx.Module):
-    """
-    Encoder module for the AutoEncoder.
-
-    Args:
-        resolution (int): Resolution of the input tensor.
-        in_channels (int): Number of input channels.
-        ch (int): Number of channels.
-        ch_mult (list[int]): List of channel multipliers.
-        num_res_blocks (int): Number of residual blocks.
-        z_channels (int): Number of latent channels.
-        rngs (nnx.Rngs): RNGs for the module.
-        dtype (DTypeLike): Data type for the module.
-        param_dtype (DTypeLike): Data type for the module parameters.
-    """
-
     def __init__(
         self,
         resolution: int,
@@ -243,8 +227,7 @@ class Encoder(nnx.Module):
         num_res_blocks: int,
         z_channels: int,
         rngs: nnx.Rngs,
-        dtype: DTypeLike = jax.dtypes.bfloat16,
-        param_dtype: DTypeLike = None,
+        param_dtype: DTypeLike = jax.dtypes.bfloat16,
     ) -> None:
         self.ch = ch
         self.num_resolutions = len(ch_mult)
@@ -253,9 +236,6 @@ class Encoder(nnx.Module):
         self.in_channels = in_channels
         self.rngs = rngs
 
-        self.dtype = dtype
-        if param_dtype is None:
-            self.param_dtype = dtype
         # downsampling
         self.conv_in = nnx.Conv(
             in_features=in_channels,
@@ -264,63 +244,59 @@ class Encoder(nnx.Module):
             strides=(1, 1),
             padding=(1, 1),
             rngs=rngs,
-            dtype=self.dtype,
-            param_dtype=self.param_dtype,
+            param_dtype=param_dtype,
         )
 
         curr_res = resolution
         in_ch_mult = (1,) + tuple(ch_mult)
         self.in_ch_mult = in_ch_mult
+        self.down = nnx.Sequential()
         block_in = self.ch
         for i_level in range(self.num_resolutions):
-            blocks = []
+            block = nnx.Sequential()
+            attn = nnx.Sequential()
             block_in = ch * in_ch_mult[i_level]
             block_out = ch * ch_mult[i_level]
             for _ in range(self.num_res_blocks):
-                blocks.append(
+                block.layers.append(
                     ResnetBlock(
                         in_channels=block_in,
                         out_channels=block_out,
                         rngs=rngs,
-                        dtype=self.dtype,
-                        param_dtype=self.param_dtype,
+                        param_dtype=param_dtype,
                     )
                 )
                 block_in = block_out
+            down = nnx.Module()
+            down.block = block
+            down.attn = attn
             if i_level != self.num_resolutions - 1:
-                blocks.append(
-                    Downsample(
-                        in_channels=block_in,
-                        rngs=rngs,
-                        dtype=self.dtype,
-                        param_dtype=self.param_dtype,
-                    )
+                down.downsample = Downsample(
+                    in_channels=block_in,
+                    rngs=rngs,
+                    param_dtype=param_dtype,
                 )
                 curr_res = curr_res // 2
-            self.down = nnx.Sequential(*blocks)
+            self.down.layers.append(down)
 
         # middle
-        self.middle = nnx.Sequential(
-            ResnetBlock(
-                in_channels=block_in,
-                out_channels=block_in,
-                rngs=rngs,
-                dtype=self.dtype,
-                param_dtype=self.param_dtype,
-            ),
-            AttnBlock(
-                in_channels=block_in,
-                rngs=rngs,
-                dtype=self.dtype,
-                param_dtype=self.param_dtype,
-            ),
-            ResnetBlock(
-                in_channels=block_in,
-                out_channels=block_in,
-                rngs=rngs,
-                dtype=self.dtype,
-                param_dtype=self.param_dtype,
-            ),
+        self.mid = nnx.Module()
+        self.mid.block_1 = ResnetBlock(
+            in_channels=block_in,
+            out_channels=block_in,
+            rngs=rngs,
+            param_dtype=param_dtype,
+        )
+        self.mid.attn_1 = AttnBlock(
+            in_channels=block_in,
+            rngs=rngs,
+            param_dtype=param_dtype,
+        )
+        self.mid.block_2 = ResnetBlock(
+            in_channels=block_in,
+            out_channels=block_in,
+            rngs=rngs,
+            param_dtype=param_dtype,
         )
 
         # end
@@ -329,8 +305,7 @@ class Encoder(nnx.Module):
             num_features=block_in,
             epsilon=1e-6,
             rngs=rngs,
-            dtype=self.dtype,
-            param_dtype=self.param_dtype,
+            param_dtype=param_dtype,
         )
         self.conv_out = nnx.Conv(
             in_features=block_in,
@@ -339,8 +314,7 @@ class Encoder(nnx.Module):
             strides=(1, 1),
             padding=(1, 1),
             rngs=rngs,
-            dtype=self.dtype,
-            param_dtype=self.param_dtype,
+            param_dtype=param_dtype,
         )
 
     def __call__(self, x: Array) -> Array:
@@ -348,19 +322,21 @@ class Encoder(nnx.Module):
         hs = [self.conv_in(x)]
         for i_level in range(self.num_resolutions):
             for i_block in range(self.num_res_blocks):
-                h = self.down[i_level].block[i_block](hs[-1])
-                if len(self.down[i_level].attn) > 0:
-                    h = self.down[i_level].attn[i_block](h)
+                h = self.down.layers[i_level].block.layers[i_block](hs[-1])
+                if len(self.down.layers[i_level].attn.layers) > 0:
+                    h = self.down.layers[i_level].attn.layers[i_block](h)
                 hs.append(h)
             if i_level != self.num_resolutions - 1:
-                hs.append(self.down[i_level].downsample(hs[-1]))
+                hs.append(self.down.layers[i_level].downsample(hs[-1]))
 
         # middle
         h = hs[-1]
-        h = self.middle(h)
+        h = self.mid.block_1(h)
+        h = self.mid.attn_1(h)
+        h = self.mid.block_2(h)
         # end
         h = self.norm_out(h)
-        h = jax.nn.swish(h)
+        h = swish(h)
         h = self.conv_out(h)
         return h
 
