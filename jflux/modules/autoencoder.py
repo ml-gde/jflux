@@ -7,9 +7,6 @@ from einops import rearrange
 from flax import nnx
 from jax.typing import DTypeLike
 
-from jflux.layers import DiagonalGaussian
-from jflux.sampling import interpolate
-
 
 @dataclass
 class AutoEncoderParams:
@@ -24,120 +21,85 @@ class AutoEncoderParams:
     shift_factor: float
 
 
+def swish(x: Array) -> Array:
+    return nnx.swish(x)
+
+
 class AttnBlock(nnx.Module):
-    """
-    Attention Block for the Encoder and Decoder.
-
-    Args:
-        in_channels (int): Number of input channels.
-        rngs (nnx.Rngs): RNGs for the module.
-        dtype (DTypeLike): Data type for the module.
-        param_dtype (DTypeLike): Data type for the module parameters.
-    """
-
     def __init__(
         self,
         in_channels: int,
         rngs: nnx.Rngs,
-        dtype: DTypeLike = jax.dtypes.bfloat16,
-        param_dtype: DTypeLike = None,
+        param_dtype: DTypeLike = jax.dtypes.bfloat16,
     ) -> None:
-        if param_dtype is None:
-            param_dtype = dtype
-
-        # Normalization Layer
         self.norm = nnx.GroupNorm(
             num_groups=32,
             num_features=in_channels,
             epsilon=1e-6,
             rngs=rngs,
-            dtype=dtype,
             param_dtype=param_dtype,
         )
 
-        # Query, Key and Value Layers
-        self.query_layer = nnx.Conv(
+        self.q = nnx.Conv(
             in_features=in_channels,
             out_features=in_channels,
             kernel_size=(1, 1),
             rngs=rngs,
-            dtype=dtype,
             param_dtype=param_dtype,
         )
-        self.key_layer = nnx.Conv(
+        self.k = nnx.Conv(
             in_features=in_channels,
             out_features=in_channels,
             kernel_size=(1, 1),
             rngs=rngs,
-            dtype=dtype,
             param_dtype=param_dtype,
         )
-        self.value_layer = nnx.Conv(
+        self.v = nnx.Conv(
             in_features=in_channels,
             out_features=in_channels,
             kernel_size=(1, 1),
             rngs=rngs,
-            dtype=dtype,
             param_dtype=param_dtype,
         )
-
-        # Output Projection Layer
-        self.projection = nnx.Conv(
+        self.proj_out = nnx.Conv(
             in_features=in_channels,
             out_features=in_channels,
             kernel_size=(1, 1),
             rngs=rngs,
-            dtype=dtype,
             param_dtype=param_dtype,
         )
 
-    def attention(self, input_tensor: Array) -> Array:
+    def attention(self, h_: Array) -> Array:
         # Apply Group Norm
-        input_tensor = self.norm(input_tensor)
-
+        h_ = self.norm(h_)
         # Calculate Query, Key and Values
-        query = self.query_layer(input_tensor)
-        key = self.key_layer(input_tensor)
-        value = self.value_layer(input_tensor)
+        q = self.q(h_)
+        k = self.k(h_)
+        v = self.v(h_)
 
-        # TODO (ariG23498): incorporate the attention fn from jflux.math
         # Reshape for JAX Attention impl
-        b, c, h, w = query.shape
-        query = rearrange(query, "b c h w -> b (h w) 1 c")
-        key = rearrange(key, "b c h w -> b (h w) 1 c")
-        value = rearrange(value, "b c h w -> b (h w) 1 c")
+        b, h, w, c = q.shape
+        q = rearrange(q, "b h w c-> b (h w) 1 c")
+        k = rearrange(k, "b h w c-> b (h w) 1 c")
+        v = rearrange(v, "b h w c-> b (h w) 1 c")
 
         # Calculate Attention
-        input_tensor = nnx.dot_product_attention(query, key, value)
-        return rearrange(input_tensor, "b (h w) 1 c -> b c h w", h=h, w=w, c=c, b=b)
+        h_ = nnx.dot_product_attention(q, k, v)
+
+        return rearrange(h_, "b (h w) 1 c -> b h w c", h=h, w=w, c=c, b=b)
 
     def __call__(self, x: Array) -> Array:
-        return x + self.projection(self.attention(x))
+        return x + self.proj_out(self.attention(x))
 
 
 class ResnetBlock(nnx.Module):
-    """
-    Residual Block for the Encoder and Decoder.
-
-    Args:
-        in_channels (int): Number of input channels.
-        out_channels (int): Number of output channels.
-        rngs (nnx.Rngs): RNGs for the module.
-        dtype (DTypeLike): Data type for the module.
-        param_dtype (DTypeLike): Data type for the module
-    """
-
     def __init__(
         self,
         in_channels: int,
         out_channels: int,
         rngs: nnx.Rngs,
-        dtype: DTypeLike = jax.dtypes.bfloat16,
-        param_dtype: DTypeLike = None,
+        param_dtype: DTypeLike = jax.dtypes.bfloat16,
     ) -> None:
-        if param_dtype is None:
-            param_dtype = dtype
-
         self.in_channels = in_channels
         self.out_channels = in_channels if out_channels is None else out_channels
 
@@ -146,7 +108,6 @@ class ResnetBlock(nnx.Module):
             num_features=in_channels,
             epsilon=1e-6,
             rngs=rngs,
-            dtype=dtype,
             param_dtype=param_dtype,
         )
         self.conv1 = nnx.Conv(
@@ -156,120 +117,83 @@ class ResnetBlock(nnx.Module):
             strides=(1, 1),
             padding=(1, 1),
             rngs=rngs,
-            dtype=dtype,
             param_dtype=param_dtype,
         )
         self.norm2 = nnx.GroupNorm(
             num_groups=32,
-            num_features=in_channels,
+            num_features=out_channels,
             epsilon=1e-6,
             rngs=rngs,
-            dtype=dtype,
             param_dtype=param_dtype,
         )
         self.conv2 = nnx.Conv(
-            in_features=in_channels,
+            in_features=out_channels,
             out_features=out_channels,
             kernel_size=(3, 3),
             strides=(1, 1),
             padding=(1, 1),
             rngs=rngs,
-            dtype=dtype,
             param_dtype=param_dtype,
         )
         if self.in_channels != self.out_channels:
             self.nin_shortcut = nnx.Conv(
                 in_features=in_channels,
                 out_features=out_channels,
-                kernel_size=(3, 3),
+                kernel_size=(1, 1),
                 strides=(1, 1),
                 padding=(0, 0),
                 rngs=rngs,
-                dtype=dtype,
                 param_dtype=param_dtype,
             )
 
-    def __call__(self, input_tensor: Array) -> Array:
-        h = input_tensor
+    def __call__(self, x: Array) -> Array:
+        h = x
         h = self.norm1(h)
-        h = jax.nn.swish(h)
+        h = swish(h)
         h = self.conv1(h)
 
         h = self.norm2(h)
-        h = jax.nn.swish(h)
+        h = swish(h)
         h = self.conv2(h)
 
         if self.in_channels != self.out_channels:
-            input_tensor = self.nin_shortcut(input_tensor)
+            x = self.nin_shortcut(x)
 
-        return input_tensor + h
+        return x + h
 
 
 class Downsample(nnx.Module):
-    """
-    Downsample Block for the Encoder.
-
-    Args:
-        in_channels (int): Number of input channels.
-        rngs (nnx.Rngs): RNGs for the module.
-        dtype (DTypeLike): Data type for the module.
-        param_dtype (DTypeLike): Data type for the module parameters.
-
-    Returns:
-        Downsampled input tensor.
-    """
-
     def __init__(
         self,
         in_channels: int,
         rngs: nnx.Rngs,
-        dtype: DTypeLike = jax.dtypes.bfloat16,
-        param_dtype: DTypeLike = None,
-    ) -> None:
-        if param_dtype is None:
-            param_dtype = dtype
-
+        param_dtype: DTypeLike = jax.dtypes.bfloat16,
+    ):
         self.conv = nnx.Conv(
             in_features=in_channels,
             out_features=in_channels,
             kernel_size=(3, 3),
-            strides=(1, 1),
+            strides=(2, 2),
             padding=(0, 0),
             rngs=rngs,
-            dtype=dtype,
             param_dtype=param_dtype,
         )
 
     def __call__(self, x: Array) -> Array:
-        x = jnp.pad(array=x, pad_width=(0, 1, 0, 1), mode="constant", constant_values=0)
+        # no padding for height and channel, padding for height and width
+        pad_width = ((0, 0), (0, 1), (0, 1), (0, 0))
+        x = jnp.pad(array=x, pad_width=pad_width, mode="constant", constant_values=0)
         x = self.conv(x)
         return x
 
 
 class Upsample(nnx.Module):
-    """
-    Upsample Block for the Decoder.
-
-    Args:
-        in_channels (int): Number of input channels.
-        rngs (nnx.Rngs): RNGs for the module.
-        dtype (DTypeLike): Data type for the module.
-        param_dtype (DTypeLike): Data type for the module parameters.
-
-    Returns:
-        Upsampled input tensor.
-    """
-
     def __init__(
         self,
         in_channels: int,
         rngs: nnx.Rngs,
-        dtype: DTypeLike = jax.dtypes.bfloat16,
-        param_dtype: DTypeLike = None,
-    ) -> None:
-        if param_dtype is None:
-            param_dtype = dtype
-
+        param_dtype: DTypeLike = jax.dtypes.bfloat16,
+    ):
         self.conv = nnx.Conv(
             in_features=in_channels,
             out_features=in_channels,
@@ -277,12 +201,19 @@ class Upsample(nnx.Module):
             strides=(1, 1),
             padding=(1, 1),
             rngs=rngs,
-            dtype=dtype,
             param_dtype=param_dtype,
         )
 
     def __call__(self, x: Array) -> Array:
-        x = interpolate(x, scale_factor=2.0, method="nearest")
+        # Assuming `x` is a 4D tensor with shape (batch, height, width, channels)
+        scale_factor = 2.0
+        b, h, w, c = x.shape
+        new_height = int(h * scale_factor)
+        new_width = int(w * scale_factor)
+        new_shape = (b, new_height, new_width, c)
+
+        # Resize using nearest-neighbor interpolation
+        x = jax.image.resize(x, new_shape, method='nearest')
         x = self.conv(x)
         return x
 

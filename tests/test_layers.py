@@ -7,9 +7,9 @@ from flux.modules.autoencoder import DiagonalGaussian as PytorchDiagonalGaussian
 from flux.modules.layers import EmbedND, LastLayer
 from flux.modules.layers import QKNorm as PytorchQKNorm
 
-from jflux.layers import AdaLayerNorm, Embed
-from jflux.layers import DiagonalGaussian as JaxDiagonalGaussian
-from jflux.layers import QKNorm as JaxQKNorm
+from jflux.modules.layers import AdaLayerNorm, Embed
+from jflux.modules.layers import DiagonalGaussian as JaxDiagonalGaussian
+from jflux.modules.layers import QKNorm as JaxQKNorm
 from tests.utils import torch2jax
 
 
