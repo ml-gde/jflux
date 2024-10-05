@@ -22,6 +22,7 @@ class AutoEncoderParams:
     rngs: nnx.Rngs
     param_dtype: DTypeLike
 
+
 def swish(x: Array) -> Array:
     return nnx.swish(x)
 
@@ -391,7 +392,7 @@ class Decoder(nnx.Module):
             rngs=rngs,
             param_dtype=param_dtype,
         )
-        self.mid.block_2 =  ResnetBlock(
+        self.mid.block_2 = ResnetBlock(
             in_channels=block_in,
             out_channels=block_in,
             rngs=rngs,
@@ -471,11 +472,11 @@ class Decoder(nnx.Module):
 
 class DiagonalGaussian(nnx.Module):
     def __init__(
-            self,
-            sample: bool = True,
-            chunk_dim: int = 1,
-            key: Array = jax.random.PRNGKey(42),
-        ):
+        self,
+        sample: bool = True,
+        chunk_dim: int = -1,
+        key: Array = jax.random.PRNGKey(42),
+    ):
         self.sample = sample
         self.chunk_dim = chunk_dim
         self.key = key
@@ -489,6 +490,7 @@ class DiagonalGaussian(nnx.Module):
             )
         else:
             return mean
+
 
 class AutoEncoder(nnx.Module):
     def __init__(
@@ -524,7 +526,6 @@ class AutoEncoder(nnx.Module):
     def encode(self, x: Array) -> Array:
         z = self.reg(self.encoder(x))
         z = self.scale_factor * (z - self.shift_factor)
-        print(f"{z.shape=}")
         return z
 
     def decode(self, z: Array) -> Array:

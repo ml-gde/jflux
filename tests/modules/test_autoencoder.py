@@ -260,8 +260,6 @@ def port_decoder(jax_decoder: JaxDecoder, torch_decoder: TorchDecoder):
                 jax_upsample=jax_upsample, torch_upsample=torch_upsample
             )
 
-    
-
     # norm out
     jax_norm_out = jax_decoder.norm_out
     torch_norm_out = torch_decoder.norm_out
@@ -279,6 +277,21 @@ def port_decoder(jax_decoder: JaxDecoder, torch_decoder: TorchDecoder):
     jax_conv_out.bias.value = torch2jax(torch_conv_out.bias)
 
     return jax_decoder
+
+
+def port_autoencoder(
+    jax_autoencoder: JaxAutoEncoder, torch_autoencoder: TorchAutoEncoder
+):
+    jax_autoencoder.encoder = port_encoder(
+        jax_encoder=jax_autoencoder.encoder,
+        torch_encoder=torch_autoencoder.encoder,
+    )
+    jax_autoencoder.decoder = port_decoder(
+        jax_decoder=jax_autoencoder.decoder,
+        torch_decoder=torch_autoencoder.decoder,
+    )
+    return jax_autoencoder
+
 
 class AutoEncodersTestCase(np.testing.TestCase):
     def test_attn_block(self):
@@ -433,12 +446,12 @@ class AutoEncodersTestCase(np.testing.TestCase):
 
     def test_encoder(self):
         # Initialize encoder
-        resolution = 16
-        in_channels = 32
+        resolution = 32
+        in_channels = 3
         ch = 32
-        ch_mult = [2, 4]
+        ch_mult = [1, 2]
         num_res_blocks = 2
-        z_channels = 64
+        z_channels = 8
         param_dtype = jnp.float32
         rngs = nnx.Rngs(default=42)
 
@@ -465,7 +478,9 @@ class AutoEncodersTestCase(np.testing.TestCase):
         jax_encoder = port_encoder(jax_encoder=jax_encoder, torch_encoder=torch_encoder)
 
         # Generate random inputs
-        np_input = np.random.randn(2, 32, 16, 16).astype(np.float32)
+        np_input = np.random.randn(1, in_channels, resolution, resolution).astype(
+            np.float32
+        )
         jax_input = jnp.array(np_input, dtype=jnp.float32)
         torch_input = torch.from_numpy(np_input).to(torch.float32)
 
@@ -473,7 +488,6 @@ class AutoEncodersTestCase(np.testing.TestCase):
 
         # Forward pass
         torch_output = torch_encoder(torch_input)
-        print(torch_output.shape)
         jax_output = jax_encoder(rearrange(jax_input, "b c h w -> b h w c"))
 
         # Assertions
@@ -486,13 +500,13 @@ class AutoEncodersTestCase(np.testing.TestCase):
 
     def test_decoder(self):
         # Initialize decoder
-        resolution = 8
-        in_channels = 128
-        ch = 16
-        out_ch = 16
-        ch_mult = [4, 2]
+        resolution = 32
+        in_channels = 3
+        ch = 32
+        out_ch = 3
+        ch_mult = [1, 2]
         num_res_blocks = 2
-        z_channels = 64
+        z_channels = 8
         param_dtype = jnp.float32
         rngs = nnx.Rngs(default=42)
 
@@ -521,7 +535,9 @@ class AutoEncodersTestCase(np.testing.TestCase):
         jax_decoder = port_decoder(jax_decoder=jax_decoder, torch_decoder=torch_decoder)
 
         # Generate random inputs
-        np_input = np.random.randn(2, 64, 8, 8).astype(np.float32)
+        np_input = np.random.randn(
+            1, z_channels, resolution // len(ch_mult), resolution // len(ch_mult)
+        ).astype(np.float32)
         jax_input = jnp.array(np_input, dtype=jnp.float32)
         torch_input = torch.from_numpy(np_input).to(torch.float32)
 
@@ -538,21 +554,23 @@ class AutoEncodersTestCase(np.testing.TestCase):
             rtol=1e-5,
             atol=1e-5,
         )
-    
+
     # TODO (ariG23498): Test the gaussians of torch and jax
     # def test_diagonal_gaussian(self):
 
     def test_autoencoder(self):
         # Initialize the autoencoder
-        resolution=32
-        in_channels=3
-        ch=32
-        out_ch=3
-        ch_mult=[1, 2]
-        num_res_blocks=2
-        z_channels=64
-        scale_factor=0.3611
-        shift_factor=0.1159
+        resolution = 32
+        in_channels = 3
+        ch = 32
+        out_ch = 3
+        ch_mult = [1, 2]
+        num_res_blocks = 2
+        z_channels = 8
+        param_dtype = jnp.float32
+        rngs = nnx.Rngs(default=42)
+        scale_factor = 0.3611
+        shift_factor = 0.1159
 
         torch_params = TorchAutoEncoderParams(
             resolution=resolution,
@@ -582,13 +600,33 @@ class AutoEncodersTestCase(np.testing.TestCase):
         torch_autoencoder = TorchAutoEncoder(params=torch_params)
         jax_autoencoder = JaxAutoEncoder(params=jax_params)
 
+        # Make things deterministic
+        torch_autoencoder.reg.sample = False
+        jax_autoencoder.reg.sample = False
+
+        # port
+        jax_autoencoder = port_autoencoder(
+            jax_autoencoder=jax_autoencoder,
+            torch_autoencoder=torch_autoencoder,
+        )
+
         # inputs
-        np_input = np.random.randn(2, in_channels, resolution, resolution).astype(np.float32)
+        np_input = np.random.randn(1, in_channels, resolution, resolution).astype(
+            np.float32
+        )
         jax_input = jnp.array(np_input, dtype=jnp.float32)
         torch_input = torch.from_numpy(np_input).to(torch.float32)
 
         np.testing.assert_allclose(np.array(jax_input), torch_input.numpy())
 
         # forward pass
-        torch_out = torch_autoencoder(torch_input)
-        jax_out = jax_autoencoder(rearrange(jax_input, "b c h w -> b h w c"))
+        torch_output = torch_autoencoder(torch_input)
+        jax_output = jax_autoencoder(rearrange(jax_input, "b c h w -> b h w c"))
+
+        # Assertions
+        np.testing.assert_allclose(
+            np.array(rearrange(jax_output, "b h w c -> b c h w")),
+            torch_output.detach().numpy(),
+            rtol=1e-5,
+            atol=1e-5,
+        )
