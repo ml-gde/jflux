@@ -1,16 +1,15 @@
 import unittest
 
+import jax.numpy as jnp
 import numpy as np
 import torch
-import jax.numpy as jnp
-
-from flux.math import rope as torch_rope
 from flux.math import apply_rope as torch_apply_rope
 from flux.math import attention as torch_attention
+from flux.math import rope as torch_rope
 
-from jflux.math import rope as jax_rope
 from jflux.math import apply_rope as jax_apply_rope
 from jflux.math import attention as jax_attention
+from jflux.math import rope as jax_rope
 
 
 class TestMath(np.testing.TestCase):

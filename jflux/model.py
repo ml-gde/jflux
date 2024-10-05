@@ -6,13 +6,13 @@ from flax import nnx
 from jax import numpy as jnp
 from jax.typing import DTypeLike
 
+from jflux.modules import DoubleStreamBlock, MLPEmbedder, SingleStreamBlock
 from jflux.modules.layers import (
     AdaLayerNorm,
     Embed,
     Identity,
     timestep_embedding,
 )
-from jflux.modules import DoubleStreamBlock, MLPEmbedder, SingleStreamBlock
 
 
 @dataclass

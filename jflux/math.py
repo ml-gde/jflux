@@ -1,7 +1,7 @@
 import jax
-from flax import nnx
 from chex import Array
 from einops import rearrange
+from flax import nnx
 from jax import numpy as jnp
 
 
