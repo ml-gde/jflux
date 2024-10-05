@@ -10,32 +10,36 @@ from jax.typing import DTypeLike
 from jflux.math import rope
 
 
-class Embed(nnx.Module):
-    """
-    Embedding module for Positional Embeddings.
-
-    Args:
-        dim (int): Dimension of the embedding.
-        theta (int): theta parameter for the RoPE embedding
-        axes_dim (list[int]): List of axes dimensions.
-
-    Returns:
-        RoPE embeddings
-    """
-
-    def __init__(self, dim: int, theta: int, axes_dim: list[int]) -> None:
+class EmbedND(nnx.Module):
+    def __init__(self, dim: int, theta: int, axes_dim: list[int]):
         self.dim = dim
         self.theta = theta
         self.axes_dim = axes_dim
 
-    def __call__(self, ids: Array) -> Array:
+    def forward(self, ids: Array) -> Array:
         n_axes = ids.shape[-1]
         emb = jnp.concat(
             [rope(ids[..., i], self.axes_dim[i], self.theta) for i in range(n_axes)],
-            axis=-3,
+            dim=-3,
         )
 
-        return jnp.expand_dims(emb, 1)
+        return emb.unsqueeze(1)
+
+
+# class Embed(nnx.Module):
+#     def __init__(self, dim: int, theta: int, axes_dim: list[int]) -> None:
+#         self.dim = dim
+#         self.theta = theta
+#         self.axes_dim = axes_dim
+
+#     def __call__(self, ids: Array) -> Array:
+#         n_axes = ids.shape[-1]
+#         emb = jnp.concat(
+#             [rope(ids[..., i], self.axes_dim[i], self.theta) for i in range(n_axes)],
+#             axis=-3,
+#         )
+
+#         return jnp.expand_dims(emb, 1)
 
 
 @partial(jax.jit, static_argnums=(1, 2, 3))
