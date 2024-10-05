@@ -6,7 +6,7 @@ from flax import nnx
 from jax import numpy as jnp
 from jax.typing import DTypeLike
 
-from jflux.layers import (
+from jflux.modules.layers import (
     AdaLayerNorm,
     Embed,
     Identity,
@@ -34,26 +34,11 @@ class FluxParams:
 class Flux(nnx.Module):
     """
     Transformer model for flow matching on sequences.
-
-    Args:
-        params (FluxParams): Model parameters.
-        rngs (nnx.Rngs): Random number generators.
-        dtype (DTypeLike, optional): Data type for the model. Defaults to jax.dtypes.bfloat16.
-        param_dtype (DTypeLike, optional): Data type for the model parameters. Defaults to None.
     """
 
-    def __init__(
-        self,
-        params: FluxParams,
-        rngs: nnx.Rngs,
-        dtype: DTypeLike = jax.dtypes.bfloat16,
-        param_dtype: DTypeLike = None,
-    ) -> None:
+    def __init__(self, params: FluxParams):
+        # Note: no super().__init__() call for nnx
         self.params = params
-        self.rngs = rngs
-        self.dtype = dtype
-        if param_dtype is None:
-            self.param_dtype = dtype
         self.in_channels = params.in_channels
         self.out_channels = self.in_channels
         if params.hidden_size % params.num_heads != 0:
