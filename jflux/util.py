@@ -8,8 +8,8 @@ from jax import numpy as jnp
 from jax.typing import DTypeLike
 from safetensors.numpy import load_file as load_sft
 
-from jflux.autoencoder import AutoEncoder, AutoEncoderParams
-from jflux.conditioner import HFEmbedder
+from jflux.modules.autoencoder import AutoEncoder, AutoEncoderParams
+from jflux.modules.conditioner import HFEmbedder
 from jflux.model import Flux, FluxParams
 
 
