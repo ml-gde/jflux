@@ -1,27 +1,25 @@
-from einops import rearrange
 import jax.numpy as jnp
+import numpy as np
 import torch
+from einops import rearrange
 from flax import nnx
-
 from flux.modules.autoencoder import AttnBlock as TorchAttnBlock
-from flux.modules.autoencoder import ResnetBlock as TorchResnetBlock
-from flux.modules.autoencoder import Downsample as TorchDownsample
-from flux.modules.autoencoder import Upsample as TorchUpsample
-from flux.modules.autoencoder import Encoder as TorchEncoder
-from flux.modules.autoencoder import Decoder as TorchDecoder
 from flux.modules.autoencoder import AutoEncoder as TorchAutoEncoder
 from flux.modules.autoencoder import AutoEncoderParams as TorchAutoEncoderParams
+from flux.modules.autoencoder import Decoder as TorchDecoder
+from flux.modules.autoencoder import Downsample as TorchDownsample
+from flux.modules.autoencoder import Encoder as TorchEncoder
+from flux.modules.autoencoder import ResnetBlock as TorchResnetBlock
+from flux.modules.autoencoder import Upsample as TorchUpsample
 
 from jflux.modules.autoencoder import AttnBlock as JaxAttnBlock
-from jflux.modules.autoencoder import ResnetBlock as JaxResnetBlock
-from jflux.modules.autoencoder import Downsample as JaxDownsample
-from jflux.modules.autoencoder import Upsample as JaxUpsample
-from jflux.modules.autoencoder import Encoder as JaxEncoder
-from jflux.modules.autoencoder import Decoder as JaxDecoder
 from jflux.modules.autoencoder import AutoEncoder as JaxAutoEncoder
 from jflux.modules.autoencoder import AutoEncoderParams as JaxAutoEncoderParams
-
-import numpy as np
+from jflux.modules.autoencoder import Decoder as JaxDecoder
+from jflux.modules.autoencoder import Downsample as JaxDownsample
+from jflux.modules.autoencoder import Encoder as JaxEncoder
+from jflux.modules.autoencoder import ResnetBlock as JaxResnetBlock
+from jflux.modules.autoencoder import Upsample as JaxUpsample
 from tests.utils import torch2jax
 
 
