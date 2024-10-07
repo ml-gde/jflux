@@ -1,9 +1,7 @@
 from dataclasses import dataclass
 
-import jax
 import jax.numpy as jnp
 from chex import Array
-from einops import rearrange
 from flax import nnx
 from flux.modules.layers import (
     DoubleStreamBlock,
@@ -74,7 +72,7 @@ class Flux(nnx.Module):
         self.guidance_in = (
             MLPEmbedder(in_dim=256, hidden_dim=self.hidden_size)
             if params.guidance_embed
-            else Identity(rngs=params.rngs, param_dtype=params.param_dtype)
+            else Identity()
         )
         self.txt_in = nnx.Linear(
             in_features=params.context_in_dim,
@@ -84,7 +82,7 @@ class Flux(nnx.Module):
             param_dtype=params.param_dtype,
         )
 
-        self.double_blocks = nnx.ModuleList(
+        self.double_blocks = nnx.Sequential(
             *[
                 DoubleStreamBlock(
                     self.hidden_size,
@@ -98,7 +96,7 @@ class Flux(nnx.Module):
             ]
         )
 
-        self.single_blocks = nnx.ModuleList(
+        self.single_blocks = nnx.Sequential(
             *[
                 SingleStreamBlock(
                     self.hidden_size,
