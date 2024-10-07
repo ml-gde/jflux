@@ -7,9 +7,9 @@ from flux.modules.layers import MLPEmbedder
 from flux.modules.layers import Modulation as PytorchModulation
 from flux.modules.layers import SelfAttention as PytorchSelfAttention
 
-from jflux.modules import MLPEmbedder as JaxMLPEmbedder
-from jflux.modules import Modulation as JaxModulation
-from jflux.modules import SelfAttention as JaxSelfAttention
+from jflux.modules.layers import MLPEmbedder as JaxMLPEmbedder
+from jflux.modules.layers import Modulation as JaxModulation
+from jflux.modules.layers import SelfAttention as JaxSelfAttention
 from tests.utils import torch2jax
 
 
@@ -18,7 +18,10 @@ class ModulesTestCase(chex.TestCase):
         # Initialize layers
         pytorch_mlp_embedder = MLPEmbedder(in_dim=512, hidden_dim=256)
         jax_mlp_embedder = JaxMLPEmbedder(
-            in_dim=512, hidden_dim=256, rngs=nnx.Rngs(default=42), dtype=jnp.float32
+            in_dim=512,
+            hidden_dim=256,
+            rngs=nnx.Rngs(default=42),
+            param_dtype=jnp.float32,
         )
 
         # Generate random inputs
@@ -37,7 +40,7 @@ class ModulesTestCase(chex.TestCase):
         # Initialize layers
         pytorch_self_attention = PytorchSelfAttention(dim=512)
         jax_self_attention = JaxSelfAttention(
-            dim=512, rngs=nnx.Rngs(default=42), dtype=jnp.float32
+            dim=512, rngs=nnx.Rngs(default=42), param_dtype=jnp.float32
         )
 
         # Generate random inputs
@@ -57,7 +60,7 @@ class ModulesTestCase(chex.TestCase):
         # Initialize layers
         pytorch_modulation = PytorchModulation(dim=512, double=True)
         jax_modulation = JaxModulation(
-            dim=512, double=True, rngs=nnx.Rngs(default=42), dtype=jnp.float32
+            dim=512, double=True, rngs=nnx.Rngs(default=42), param_dtype=jnp.float32
         )
 
         # Generate random inputs

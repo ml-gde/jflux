@@ -3,17 +3,17 @@ import numpy as np
 import torch
 from einops import rearrange
 from flax import nnx
+from flux.modules.layers import DoubleStreamBlock as TorchDoubleStreamBlock
 from flux.modules.layers import MLPEmbedder as TorchMLPEmbedder
 from flux.modules.layers import Modulation as TorchModulation
 from flux.modules.layers import QKNorm as TorchQKNorm
 from flux.modules.layers import RMSNorm as TorchRMSNorm
-from flux.modules.layers import DoubleStreamBlock as TorchDoubleStreamBlock
 
+from jflux.modules.layers import DoubleStreamBlock as JaxDoubleStreamBlock
 from jflux.modules.layers import MLPEmbedder as JaxMLPEmbedder
 from jflux.modules.layers import Modulation as JaxModulation
 from jflux.modules.layers import QKNorm as JaxQKNorm
 from jflux.modules.layers import RMSNorm as JaxRMSNorm
-from jflux.modules.layers import DoubleStreamBlock as JaxDoubleStreamBlock
 from tests.utils import torch2jax
 
 
