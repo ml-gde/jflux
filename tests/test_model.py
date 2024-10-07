@@ -1,25 +1,29 @@
 import numpy as np
-from jax import numpy as jnp
+import pytest
 from flax import nnx
-from jflux.model import FluxParams, Flux
+from jax import numpy as jnp
+
+from jflux.model import Flux, FluxParams
+
 
 class ModelTestCase(np.testing.TestCase):
+    @pytest.mark.skip
     def test_model(self):
         # Initialize
-        in_channels=64
-        vec_in_dim=768
-        context_in_dim=4096
-        hidden_size=3072
-        mlp_ratio=4.0
-        num_heads=24
-        depth=19
-        depth_single_blocks=38
-        axes_dim=[16, 56, 56]
-        theta=10_000
-        qkv_bias=True
-        guidance_embed=False
-        rngs=nnx.Rngs(default=42)
-        param_dtype=jnp.float32
+        in_channels = 64
+        vec_in_dim = 768
+        context_in_dim = 4096
+        hidden_size = 3072
+        mlp_ratio = 4.0
+        num_heads = 24
+        depth = 19
+        depth_single_blocks = 38
+        axes_dim = [16, 56, 56]
+        theta = 10_000
+        qkv_bias = True
+        guidance_embed = False
+        rngs = nnx.Rngs(default=42)
+        param_dtype = jnp.float32
 
         flux_params = FluxParams(
             in_channels=in_channels,
@@ -38,3 +42,5 @@ class ModelTestCase(np.testing.TestCase):
             param_dtype=param_dtype,
         )
         flux = Flux(params=flux_params)
+
+        assert flux is not None

@@ -247,7 +247,7 @@ class LayersTestCase(np.testing.TestCase):
             hidden_size=hidden_size,
             num_heads=num_heads,
             mlp_ratio=mlp_ratio,
-            qkv_bias=qkv_bias
+            qkv_bias=qkv_bias,
         )
         jax_double_stream_block = JaxDoubleStreamBlock(
             hidden_size=hidden_size,
@@ -259,10 +259,20 @@ class LayersTestCase(np.testing.TestCase):
         )
 
         # Create the dummy inputs
-        np_img = np.random.randn(2, 10, hidden_size).astype(np.float32)  # Batch size 2, sequence length 10, hidden size 64 (image input)
-        np_txt = np.random.randn(2, 15, hidden_size).astype(np.float32)  # Batch size 2, sequence length 15, hidden size 64 (text input)
-        np_vec = np.random.randn(2, hidden_size).astype(np.float32)      # Batch size 2, hidden size 64 (modulation vector)
-        np_pe = np.random.randn(2, 25, hidden_size).astype(np.float32)   # Batch size 2, total length 25 (10 + 15), hidden size 64 (positional embedding)
+        np_img = np.random.randn(2, 10, hidden_size).astype(
+            np.float32
+        )  # Batch size 2, sequence length 10, hidden size 64 (image input)
+        np_txt = np.random.randn(2, 15, hidden_size).astype(
+            np.float32
+        )  # Batch size 2, sequence length 15, hidden size 64 (text input)
+        np_vec = np.random.randn(2, hidden_size).astype(
+            np.float32
+        )  # Batch size 2, hidden size 64 (modulation vector)
+        np_pe = np.random.randn(
+            2, 25, hidden_size
+        ).astype(
+            np.float32
+        )  # Batch size 2, total length 25 (10 + 15), hidden size 64 (positional embedding)
 
         jax_img = jnp.array(np_img, dtype=jnp.float32)
         jax_txt = jnp.array(np_txt, dtype=jnp.float32)
