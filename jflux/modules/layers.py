@@ -93,7 +93,9 @@ class MLPEmbedder(nnx.Module):
 
 
 class RMSNorm(nnx.Module):
-    def __init__(self, dim: int,
+    def __init__(
+        self,
+        dim: int,
         rngs: nnx.Rngs,
         param_dtype: DTypeLike = jax.dtypes.bfloat16,
     ):
@@ -102,9 +104,7 @@ class RMSNorm(nnx.Module):
     def __call__(self, x: Array):
         x_dtype = x.dtype
         x = x.astype(jnp.float32)
-        rrms = jnp.reciprocal(
-            jnp.sqrt(jnp.mean(x**2, axis=-1, keepdims=True) + 1e-6)
-        )
+        rrms = jnp.reciprocal(jnp.sqrt(jnp.mean(x**2, axis=-1, keepdims=True) + 1e-6))
         return (x * rrms).astype(dtype=x_dtype) * self.scale
 
 
@@ -187,7 +187,10 @@ class Modulation(nnx.Module):
         )
 
     def __call__(self, vec: Array) -> tuple[ModulationOut, ModulationOut | None]:
-        out = self.lin(nnx.silu(vec))[:, None, :].split(self.multiplier, dim=-1)
+        out = jnp.split(
+            self.lin(nnx.silu(vec))[:, None, :],
+            self.multiplier, axis=-1
+        )
 
         return (
             ModulationOut(*out[:3]),
@@ -234,7 +237,6 @@ class DoubleStreamBlock(nnx.Module):
             param_dtype=param_dtype,
         )
         self.img_mlp = nnx.Sequential(
-            layers=[
                 nnx.Linear(
                     in_features=hidden_size,
                     out_features=mlp_hidden_dim,
@@ -250,7 +252,6 @@ class DoubleStreamBlock(nnx.Module):
                     rngs=rngs,
                     param_dtype=param_dtype,
                 ),
-            ]
         )
 
         self.txt_mod = Modulation(
@@ -279,7 +280,6 @@ class DoubleStreamBlock(nnx.Module):
             param_dtype=param_dtype,
         )
         self.txt_mlp = nnx.Sequential(
-            layers=[
                 nnx.Linear(
                     in_features=hidden_size,
                     out_features=mlp_hidden_dim,
@@ -295,7 +295,6 @@ class DoubleStreamBlock(nnx.Module):
                     rngs=rngs,
                     param_dtype=param_dtype,
                 ),
-            ]
         )
 
     def __call__(
@@ -437,7 +436,6 @@ class LastLayer(nnx.Module):
             param_dtype=param_dtype,
         )
         self.adaLN_modulation = nnx.Sequential(
-            layers=[
                 nnx.silu,
                 nnx.Linear(
                     in_features=hidden_size,
@@ -446,7 +444,6 @@ class LastLayer(nnx.Module):
                     rngs=rngs,
                     param_dtype=param_dtype,
                 ),
-            ]
         )
 
     def forward(self, x: Array, vec: Array) -> Array:
