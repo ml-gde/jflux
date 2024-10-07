@@ -77,9 +77,9 @@ def prepare(
         img = repeat(img, "1 ... -> bs ...", bs=bs)
 
     # prepare image ids
-    img_ids = jnp.zeros(shape=(h // 2, w // 2), device=device)
-    img_ids[..., 1] = img_ids[..., 1] + jnp.arange(h // 2)[:, None]
-    img_ids[..., 2] = img_ids[..., 2] + jnp.arange(w // 2)[None, :]
+    img_ids = jnp.zeros(shape=(h // 2, w // 2, 3), device=device)
+    img_ids = img_ids.at[..., 1].set(jnp.arange(h // 2)[:, None])
+    img_ids = img_ids.at[..., 2].set(jnp.arange(w // 2)[None, :])
     img_ids = repeat(img_ids, "h w c -> b (h w) c", b=bs)
 
     # prepare txt
