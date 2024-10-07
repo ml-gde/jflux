@@ -3,7 +3,9 @@ from dataclasses import dataclass
 import jax.numpy as jnp
 from chex import Array
 from flax import nnx
-from flux.modules.layers import (
+from jax.typing import DTypeLike
+
+from jflux.modules.layers import (
     DoubleStreamBlock,
     EmbedND,
     LastLayer,
@@ -11,7 +13,6 @@ from flux.modules.layers import (
     SingleStreamBlock,
     timestep_embedding,
 )
-from jax.typing import DTypeLike
 
 
 @dataclass
@@ -67,8 +68,18 @@ class Flux(nnx.Module):
             rngs=params.rngs,
             param_dtype=params.param_dtype,
         )
-        self.time_in = MLPEmbedder(in_dim=256, hidden_dim=self.hidden_size)
-        self.vector_in = MLPEmbedder(params.vec_in_dim, self.hidden_size)
+        self.time_in = MLPEmbedder(
+            in_dim=256,
+            hidden_dim=self.hidden_size,
+            rngs=params.rngs,
+            param_dtype=params.param_dtype,
+        )
+        self.vector_in = MLPEmbedder(
+            params.vec_in_dim,
+            self.hidden_size,
+            rngs=params.rngs,
+            param_dtype=params.param_dtype,
+        )
         self.guidance_in = (
             MLPEmbedder(in_dim=256, hidden_dim=self.hidden_size)
             if params.guidance_embed
