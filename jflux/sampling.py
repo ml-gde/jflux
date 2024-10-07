@@ -8,8 +8,8 @@ from jax import numpy as jnp
 from jax.image import ResizeMethod
 from jax.typing import DTypeLike
 
-from jflux.conditioner import HFEmbedder
 from jflux.model import Flux
+from jflux.modules.conditioner import HFEmbedder
 
 
 def get_noise(
