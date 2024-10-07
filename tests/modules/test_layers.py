@@ -186,6 +186,8 @@ class LayersTestCase(np.testing.TestCase):
             atol=1e-5,
         )
 
+    # TODO (SauravMaheshkar): Add test for SelfAttention Module
+
     def test_modulation(self):
         # Initialize the layer
         dim = 4
