@@ -2,9 +2,9 @@ from chex import Array
 from flax import nnx
 from transformers import (
     CLIPTokenizer,
+    T5Tokenizer,
     FlaxCLIPTextModel,
     FlaxT5EncoderModel,
-    T5Tokenizer,
 )
 
 
