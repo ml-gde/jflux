@@ -619,11 +619,11 @@ class AutoEncodersTestCase(np.testing.TestCase):
 
         # forward pass
         torch_output = torch_autoencoder(torch_input)
-        jax_output = jax_autoencoder(rearrange(jax_input, "b c h w -> b h w c"))
+        jax_output = jax_autoencoder(jax_input)
 
         # Assertions
         np.testing.assert_allclose(
-            np.array(rearrange(jax_output, "b h w c -> b c h w")),
+            np.array(jax_output),
             torch_output.detach().numpy(),
             rtol=1e-5,
             atol=1e-5,
