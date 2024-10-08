@@ -54,7 +54,9 @@ def timestep_embedding(
     embedding = jnp.concatenate([jnp.cos(args), jnp.sin(args)], axis=-1)
 
     if dim % 2:
-        embedding = jnp.concatenate([embedding, jnp.zeros_like(embedding[:, :1])], axis=-1)
+        embedding = jnp.concatenate(
+            [embedding, jnp.zeros_like(embedding[:, :1])], axis=-1
+        )
 
     if jnp.issubdtype(t.dtype, jnp.floating):
         embedding = embedding.astype(t.dtype)
@@ -393,9 +395,7 @@ class SingleStreamBlock(nnx.Module):
     def __call__(self, x: Array, vec: Array, pe: Array) -> Array:
         mod, _ = self.modulation(vec)
         x_mod = (1 + mod.scale) * self.pre_norm(x) + mod.shift
-        qkv, mlp = jnp.split(
-            self.linear1(x_mod), [3 * self.hidden_size, self.mlp_hidden_dim], axis=-1
-        )
+        qkv, mlp = jnp.split(self.linear1(x_mod), [3 * self.hidden_size], axis=-1)
 
         q, k, v = rearrange(qkv, "B L (K H D) -> K B H L D", K=3, H=self.num_heads)
         q, k = self.norm(q, k, v)
@@ -441,8 +441,12 @@ class LastLayer(nnx.Module):
             ),
         )
 
-    def forward(self, x: Array, vec: Array) -> Array:
-        shift, scale = self.adaLN_modulation(vec).chunk(2, axis=1)
+    def __call__(self, x: Array, vec: Array) -> Array:
+        shift, scale = jnp.split(
+            self.adaLN_modulation(vec),
+            2,
+            axis=1,
+        )
         x = (1 + scale[:, None, :]) * self.norm_final(x) + shift[:, None, :]
         x = self.linear(x)
         return x

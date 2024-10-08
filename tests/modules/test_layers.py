@@ -407,5 +407,7 @@ class LayersTestCase(np.testing.TestCase):
 
         ids = jnp.concatenate((txt_ids, img_ids), axis=1)
 
-        pe = JaxEmbedND(dim=128, theta=10_000, axes_dim=[16, 56, 56])(ids)  # dim = hidden_dim/num_head
-        print(pe.shape)
+        pe = JaxEmbedND(dim=128, theta=10_000, axes_dim=[16, 56, 56])(
+            ids
+        )  # dim = hidden_dim/num_head
+        print(pe.shape)  # (1, 1, 4592, 64, 2, 2)

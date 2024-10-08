@@ -159,7 +159,7 @@ class Flux(nnx.Module):
         for block in self.double_blocks.layers:
             img, txt = block(img=img, txt=txt, vec=vec, pe=pe)
 
-        img = jnp.concatenate((txt, img), 1)
+        img = jnp.concatenate((txt, img), axis=1)
         for block in self.single_blocks.layers:
             img = block(img, vec=vec, pe=pe)
         img = img[:, txt.shape[1] :, ...]
