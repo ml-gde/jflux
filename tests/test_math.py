@@ -22,19 +22,14 @@ class TestMath(np.testing.TestCase):
         )  # Batch size, sequence length, number of heads, embedding dimension
         theta = 10000
 
-        # Position indices (e.g., positions in the sequence)
-        np_positions = (
-            np.expand_dims(np.arange(L), 0).repeat(B, 1).astype(np.int32)
-        )  # Shape: [B, L]
+        np_positions = np.expand_dims(np.arange(L), 0).repeat(B, 1).astype(np.int32)
         torch_positions = torch.from_numpy(np_positions).to(torch.int32)
         jax_positions = jnp.array(np_positions, dtype=jnp.int32)
 
         np.testing.assert_allclose(np.array(jax_positions), torch_positions.numpy())
 
         torch_pe = torch_rope(pos=torch_positions, dim=D, theta=theta)
-        jax_pe = jax_rope(
-            pos=jax_positions, dim=D, theta=theta
-        )  # Shape: [B, L, D/2, 2, 2]
+        jax_pe = jax_rope(pos=jax_positions, dim=D, theta=theta)
 
         np.testing.assert_allclose(
             np.array(jax_pe),
@@ -126,32 +121,6 @@ class TestMath(np.testing.TestCase):
     #         torch_output.detach().numpy(),
     #         rtol=1e-5,
     #         atol=1e-5,
-    #     )
-
-    # def test_rope(self):
-    #     pos = jnp.expand_dims(jnp.arange(self.seq_len), axis=0)
-    #     pos = jnp.repeat(pos, self.batch_size, axis=0)
-
-    #     rope_output = rope(pos, self.dim, self.theta)
-    #     expected_shape = (self.batch_size, self.seq_len, self.dim // 2, 2, 2)
-
-    #     self.assertEqual(
-    #         rope_output.shape, expected_shape, "rope function output shape is incorrect"
-    #     )
-
-    # @pytest.mark.xfail
-    # def test_apply_rope(self):
-    #     pos = jnp.expand_dims(jnp.arange(self.seq_len), axis=0)
-    #     pos = jnp.repeat(pos, self.batch_size, axis=0)
-
-    #     freqs_cis = rope(pos, self.dim, self.theta)
-    #     xq_out, xk_out = apply_rope(self.q, self.k, freqs_cis)
-
-    #     self.assertEqual(
-    #         xq_out.shape, self.q.shape, "apply_rope xq output shape is incorrect"
-    #     )
-    #     self.assertEqual(
-    #         xk_out.shape, self.k.shape, "apply_rope xk output shape is incorrect"
     #     )
 
     # @pytest.mark.xfail

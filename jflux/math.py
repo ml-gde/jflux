@@ -1,4 +1,3 @@
-import jax
 from chex import Array
 from einops import rearrange
 from flax import nnx
@@ -16,7 +15,7 @@ def attention(q: Array, k: Array, v: Array, pe: Array) -> Array:
 
 def rope(pos: Array, dim: int, theta: int) -> Array:
     assert dim % 2 == 0
-    scale = jnp.arange(0, dim, 2, dtype=jnp.float64, device=pos.device) / dim
+    scale = jnp.arange(0, dim, 2, dtype=jnp.float32) / dim
     omega = 1.0 / (theta**scale)
     out = jnp.einsum("...n,d->...nd", pos, omega)
     out = jnp.stack([jnp.cos(out), -jnp.sin(out), jnp.sin(out), jnp.cos(out)], axis=-1)

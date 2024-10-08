@@ -1,16 +1,19 @@
 import os
 from dataclasses import dataclass
 
+import torch  # need for t5 and clip
 import jax
 from flax import nnx
 from huggingface_hub import hf_hub_download
 from jax import numpy as jnp
 from jax.typing import DTypeLike
-from safetensors.numpy import load_file as load_sft
+from safetensors import safe_open
 
 from jflux.model import Flux, FluxParams
 from jflux.modules.autoencoder import AutoEncoder, AutoEncoderParams
 from jflux.modules.conditioner import HFEmbedder
+
+from port import port_autoencoder
 
 
 @dataclass
@@ -43,6 +46,8 @@ configs = {
             theta=10_000,
             qkv_bias=True,
             guidance_embed=True,
+            rngs=nnx.Rngs(default=42),
+            param_dtype=jnp.bfloat16,
         ),
         ae_path=os.getenv("AE"),
         ae_params=AutoEncoderParams(
@@ -55,6 +60,8 @@ configs = {
             z_channels=16,
             scale_factor=0.3611,
             shift_factor=0.1159,
+            rngs=nnx.Rngs(default=42),
+            param_dtype=jnp.bfloat16,
         ),
     ),
     "flux-schnell": ModelSpec(
@@ -75,6 +82,8 @@ configs = {
             theta=10_000,
             qkv_bias=True,
             guidance_embed=False,
+            rngs=nnx.Rngs(default=42),
+            param_dtype=jnp.bfloat16,
         ),
         ae_path=os.getenv("AE"),
         ae_params=AutoEncoderParams(
@@ -87,6 +96,8 @@ configs = {
             z_channels=16,
             scale_factor=0.3611,
             shift_factor=0.1159,
+            rngs=nnx.Rngs(default=42),
+            param_dtype=jnp.bfloat16,
         ),
     ),
 }
@@ -103,17 +114,7 @@ def print_load_warning(missing: list[str], unexpected: list[str]) -> None:
         print(f"Got {len(unexpected)} unexpected keys:\n\t" + "\n\t".join(unexpected))
 
 
-def load_flow_model(
-    name: str,
-    rngs: nnx.Rngs,
-    device="cuda",
-    hf_download: bool = True,
-    dtype: DTypeLike = jax.dtypes.bfloat16,
-    param_dtype: DTypeLike = None,
-):
-    if param_dtype is None:
-        param_dtype = dtype
-
+def load_flow_model(name: str, hf_download: bool = True) -> Flux:
     # Loading Flux
     print("Init model")
     ckpt_path = configs[name].ckpt_path
@@ -125,44 +126,33 @@ def load_flow_model(
     ):
         ckpt_path = hf_hub_download(configs[name].repo_id, configs[name].repo_flow)
 
-    with jax.default_device(device):
-        model = Flux(
-            configs[name].params, rngs=rngs, dtype=dtype, param_dtype=param_dtype
-        )
+    model = Flux(params=configs[name].params)
 
+    # TODO (ariG23498): Port the flux model
     if ckpt_path is not None:
         print("Loading checkpoint")
         # load_sft doesn't support torch.device
-        sd = load_sft(ckpt_path, device=str(device))
+        sd = load_sft(ckpt_path)
         missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
         print_load_warning(missing, unexpected)
     return model
 
 
-# FIXME (ariG23498): Correct usage of device, HFEmbedder doesn't implement .to()
-def load_t5(max_length: int = 512) -> HFEmbedder:
-    # max length 64, 128, 256 and 512 should work (if your sequence is short enough)
-    return HFEmbedder("google/t5-v1_1-xxl", max_length=max_length, dtype=jnp.bfloat16)
-
-
-# FIXME (ariG23498): Correct usage of device, HFEmbedder doesn't implement .to()
-def load_clip() -> HFEmbedder:
+def load_t5() -> HFEmbedder:
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     return HFEmbedder(
-        "openai/clip-vit-large-patch14", max_length=77, torch_dtype=jnp.bfloat16
-    )
+        "google/t5-v1_1-xxl", max_length=512, torch_dtype=torch.bfloat16
+    ).to(device)
 
 
-def load_ae(
-    name: str,
-    rngs: nnx.Rngs,
-    device="cuda",
-    hf_download: bool = True,
-    dtype: DTypeLike = jax.dtypes.bfloat16,
-    param_dtype: DTypeLike = None,
-) -> AutoEncoder:
-    if param_dtype is None:
-        param_dtype = dtype
+def load_clip() -> HFEmbedder:
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    return HFEmbedder(
+        "openai/clip-vit-large-patch14", max_length=77, torch_dtype=torch.bfloat16
+    ).to(device)
 
+
+def load_ae(name: str, hf_download: bool = True) -> AutoEncoder:
     ckpt_path = configs[name].ae_path
     if (
         ckpt_path is None
@@ -174,13 +164,14 @@ def load_ae(
 
     # Loading the autoencoder
     print("Init AE")
-    with jax.default_device(device):
-        ae = AutoEncoder(
-            configs[name].ae_params, rngs=rngs, dtype=dtype, param_dtype=param_dtype
-        )
+    ae = AutoEncoder(params=configs[name].ae_params)
 
+    # TODO (ariG23498): Port the flux model
     if ckpt_path is not None:
-        sd = load_sft(ckpt_path, device=str(device))
-        missing, unexpected = ae.load_state_dict(sd, strict=False, assign=True)
-        print_load_warning(missing, unexpected)
+        tensors = {}
+        with safe_open(ckpt_path, framework="flax") as f:
+            for k in f.keys():
+                tensors[k] = f.get_tensor(k)
+
+        ae = port_autoencoder(autoencoder=ae, tensors=tensors)
     return ae

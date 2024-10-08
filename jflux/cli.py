@@ -6,9 +6,13 @@ from glob import iglob
 
 import jax
 import jax.numpy as jnp
+from flax import nnx
 from fire import Fire
 from jax.typing import DTypeLike
 
+from PIL import Image
+
+from einops import rearrange
 from jflux.sampling import denoise, get_noise, get_schedule, prepare, unpack
 from jflux.util import configs, load_ae, load_clip, load_flow_model, load_t5
 
@@ -101,50 +105,34 @@ def main(
         "a photo of a forest with mist swirling around the tree trunks. The word "
         '"FLUX" is painted over it in big, red brush strokes with visible texture'
     ),
-    device: str = "gpu" if jax.device_get("gpu") else "cpu",
     num_steps: int | None = None,
     loop: bool = False,
     guidance: float = 3.5,
-    # TODO: JAX variant of offloading to CPU
     offload: bool = False,
     output_dir: str = "output",
-    dtype: DTypeLike = jax.dtypes.bfloat16,
-    param_dtype: DTypeLike = None,
-) -> None:
+    add_sampling_metadata: bool = True,
+):
     """
-    Sample the flux model.
+    Sample the flux model. Either interactively (set `--loop`) or run for a
+    single image.
 
     Args:
-        name(str): Name of the model to use. Choose from 'flux-schnell' or 'flux-dev'.
-        width(int): Width of the generated image.
-        height(int): Height of the generated image.
-        seed(int, optional): Seed for the random number generator.
-        prompt(str): Text prompt to generate the image from.
-        device(str): Device to run the model on. Choose from 'cpu' or 'gpu'.
-        num_steps(int, optional): Number of steps to run the model for.
-        loop(bool): Whether to loop the sampling process.
-        guidance(float, optional): Guidance for the model, defaults to 3.5.
-        offload(bool, optional): Whether to offload the model to CPU, defaults to False.
-        output_dir(str, optional): Directory to save the output images in, defaults to 'output'.
-        dtype(DTypeLike, optional): Data type for the model, defaults to jax.dtypes.bfloat16.
-        param_dtype(DTypeLike, optional): Data type for the model parameters, defaults to None.
+        name: Name of the model to load
+        height: height of the sample in pixels (should be a multiple of 16)
+        width: width of the sample in pixels (should be a multiple of 16)
+        seed: Set a seed for sampling
+        output_name: where to save the output image, `{idx}` will be replaced
+            by the index of the sample
+        prompt: Prompt used for sampling
+        device: Pytorch device
+        num_steps: number of sampling steps (default 4 for schnell, 50 for guidance distilled)
+        loop: start an interactive session and sample multiple times
+        guidance: guidance value used for guidance distillation
+        add_sampling_metadata: Add the prompt to the image Exif metadata
     """
-
-    if param_dtype is None:
-        param_dtype = dtype
-
     if name not in configs:
         available = ", ".join(configs.keys())
         raise ValueError(f"Got unknown model name: {name}, chose from {available}")
-
-    jax_device = jax.devices(device)
-    if len(jax_device) == 1:
-        jax_device = jax_device[0]
-    else:
-        # TODO (ariG23498)
-        # this will be when there are more than
-        # one devices to work on
-        pass
 
     if num_steps is None:
         num_steps = 4 if name == "flux-schnell" else 50
@@ -169,26 +157,11 @@ def main(
             idx = 0
 
     # init all components
-    import sys
-
-    sys.exit(0)
-    t5 = load_t5(max_length=256 if name == "flux-schnell" else 512)
+    t5 = load_t5()
     clip = load_clip()
-    model = load_flow_model(
-        name,
-        device="cpu" if offload else jax_device,
-        dtype=dtype,
-        param_dtype=param_dtype,
-    )
-    ae = load_ae(
-        name,
-        device="cpu" if offload else jax_device,
-        dtype=dtype,
-        param_dtype=param_dtype,
-    )
+    model = load_flow_model(name)
+    ae = load_ae(name)
 
-    # TODO (ariG23498)
-    # rngs = nnx.Rngs(0)
     opts = SamplingOptions(
         prompt=prompt,
         width=width,
@@ -200,57 +173,51 @@ def main(
 
     while opts is not None:
         if opts.seed is None:
-            # TODO (ariG23498)
-            # set the rng seed
-            # opts.seed = rng.seed()
-            pass
+            opts.seed = jax.random.PRNGKey(seed=42)
         print(f"Generating with seed {opts.seed}:\n{opts.prompt}")
         t0 = time.perf_counter()
 
         # prepare input
         x = get_noise(
-            1,
-            opts.height,
-            opts.width,
-            device=jax_device,
+            num_samples=1,
+            height=opts.height,
+            width=opts.width,
             dtype=jax.dtypes.bfloat16,
-            seed=opts.seed,  # type: ignore
+            seed=opts.seed,
         )
         opts.seed = None
-        # TODO: JAX variant of offloading to CPU
-        # if offload:
-        #     ae = ae.cpu()
-        #     torch.cuda.empty_cache()
-        #     t5, clip = t5.to(torch_device), clip.to(torch_device)
-        inp = prepare(t5, clip, img=x, prompt=opts.prompt, device=jax_device)
+
+        inp = prepare(t5=t5, clip=clip, img=x, prompt=opts.prompt)
         timesteps = get_schedule(
-            opts.num_steps, inp["img"].shape[1], shift=(name != "flux-schnell")
+            num_steps=opts.num_steps,
+            image_seq_len=inp["img"].shape[1],
+            shift=(name != "flux-schnell"),
         )
 
-        # offload TEs to CPU, load model to gpu
-        # TODO: JAX variant of offloading to CPU
-        # if offload:
-        #     t5, clip = t5.cpu(), clip.cpu()
-        #     torch.cuda.empty_cache()
-        #     model = model.to(torch_device)
-
         # denoise initial noise
-        x = denoise(model, **inp, timesteps=timesteps, guidance=opts.guidance)
-
-        # offload model, load autoencoder to gpu
-        # TODO: JAX variant of offloading to CPU
-        # if offload:
-        #     model.cpu()
-        #     torch.cuda.empty_cache()
-        #     ae.decoder.to(x.device)
+        x = denoise(
+            model=model,
+            img=inp["img"],
+            img_ids=inp["img_ids"],
+            txt=inp["txt"],
+            txt_ids=inp["txt_ids"],
+            vec=inp["vec"],
+            timesteps=timesteps,
+            guidance=opts.guidance,
+        )
 
         # decode latents to pixel space
-        x = unpack(x.astype(jnp.float32), opts.height, opts.width)
-        x = ae.decode(x).astype(dtype=jax.dtypes.bfloat16)  # noqa
+        x = unpack(x=x.astype(jnp.float32), height=opts.height, width=opts.width)
+        x = ae.decode(x)
         t1 = time.perf_counter()
 
         fn = output_name.format(idx=idx)
         print(f"Done in {t1 - t0:.1f}s. Saving {fn}")
+        # bring into PIL format and save
+        x = x.clip(-1, 1)
+        x = rearrange(x[0], "c h w -> h w c")
+
+        img = Image.fromarray((127.5 * (x + 1.0)))
 
         if loop:
             print("-" * 80)

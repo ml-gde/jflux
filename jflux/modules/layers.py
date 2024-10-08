@@ -19,9 +19,9 @@ class EmbedND(nnx.Module):
 
     def __call__(self, ids: Array) -> Array:
         n_axes = ids.shape[-1]
-        emb = jnp.concat(
+        emb = jnp.concatenate(
             [rope(ids[..., i], self.axes_dim[i], self.theta) for i in range(n_axes)],
-            dim=-3,
+            axis=-3,
         )
 
         return jnp.expand_dims(emb, axis=1)
@@ -47,19 +47,19 @@ def timestep_embedding(
     half = dim // 2
 
     freqs = jnp.exp(
-        -math.log(max_period)
-        * jnp.arange(start=0, stop=half, dtype=jnp.float32, device=t.device)
-        / half
-    ).astype(dtype=t.device)
+        -math.log(max_period) * jnp.arange(start=0, stop=half, dtype=jnp.float32) / half
+    ).astype(dtype=t.dtype)
 
     args = t[:, None].astype(jnp.float32) * freqs[None]
-    embedding = jnp.concat([jnp.cos(args), jnp.sin(args)], axis=-1)
+    embedding = jnp.concatenate([jnp.cos(args), jnp.sin(args)], axis=-1)
 
     if dim % 2:
-        embedding = jnp.concat([embedding, jnp.zeros_like(embedding[:, :1])], axis=-1)
+        embedding = jnp.concatenate(
+            [embedding, jnp.zeros_like(embedding[:, :1])], axis=-1
+        )
 
-    if jnp.issubdtype(t.device(), jnp.floating):
-        embedding = embedding.astype(t.device())
+    if jnp.issubdtype(t.dtype, jnp.floating):
+        embedding = embedding.astype(t.dtype)
 
     return embedding
 
@@ -121,7 +121,7 @@ class QKNorm(nnx.Module):
     def __call__(self, q: Array, k: Array, v: Array) -> tuple[Array, Array]:
         q = self.query_norm(q)
         k = self.key_norm(k)
-        return q.to_device(v.device), k.to_device(v.device)
+        return q, k
 
 
 class SelfAttention(nnx.Module):
@@ -319,9 +319,9 @@ class DoubleStreamBlock(nnx.Module):
         txt_q, txt_k = self.txt_attn.norm(txt_q, txt_k, txt_v)
 
         # run actual attention
-        q = jnp.concat((txt_q, img_q), axis=2)
-        k = jnp.concat((txt_k, img_k), axis=2)
-        v = jnp.concat((txt_v, img_v), axis=2)
+        q = jnp.concatenate((txt_q, img_q), axis=2)
+        k = jnp.concatenate((txt_k, img_k), axis=2)
+        v = jnp.concatenate((txt_v, img_v), axis=2)
 
         attn = attention(q, k, v, pe=pe)
         txt_attn, img_attn = attn[:, : txt.shape[1]], attn[:, txt.shape[1] :]
@@ -395,9 +395,7 @@ class SingleStreamBlock(nnx.Module):
     def __call__(self, x: Array, vec: Array, pe: Array) -> Array:
         mod, _ = self.modulation(vec)
         x_mod = (1 + mod.scale) * self.pre_norm(x) + mod.shift
-        qkv, mlp = jnp.split(
-            self.linear1(x_mod), [3 * self.hidden_size, self.mlp_hidden_dim], dim=-1
-        )
+        qkv, mlp = jnp.split(self.linear1(x_mod), [3 * self.hidden_size], axis=-1)
 
         q, k, v = rearrange(qkv, "B L (K H D) -> K B H L D", K=3, H=self.num_heads)
         q, k = self.norm(q, k, v)
@@ -443,8 +441,12 @@ class LastLayer(nnx.Module):
             ),
         )
 
-    def forward(self, x: Array, vec: Array) -> Array:
-        shift, scale = self.adaLN_modulation(vec).chunk(2, dim=1)
+    def __call__(self, x: Array, vec: Array) -> Array:
+        shift, scale = jnp.split(
+            self.adaLN_modulation(vec),
+            2,
+            axis=1,
+        )
         x = (1 + scale[:, None, :]) * self.norm_final(x) + shift[:, None, :]
         x = self.linear(x)
         return x

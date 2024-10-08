@@ -3,7 +3,9 @@ from dataclasses import dataclass
 import jax.numpy as jnp
 from chex import Array
 from flax import nnx
-from flux.modules.layers import (
+from jax.typing import DTypeLike
+
+from jflux.modules.layers import (
     DoubleStreamBlock,
     EmbedND,
     LastLayer,
@@ -11,7 +13,6 @@ from flux.modules.layers import (
     SingleStreamBlock,
     timestep_embedding,
 )
-from jax.typing import DTypeLike
 
 
 @dataclass
@@ -67,8 +68,18 @@ class Flux(nnx.Module):
             rngs=params.rngs,
             param_dtype=params.param_dtype,
         )
-        self.time_in = MLPEmbedder(in_dim=256, hidden_dim=self.hidden_size)
-        self.vector_in = MLPEmbedder(params.vec_in_dim, self.hidden_size)
+        self.time_in = MLPEmbedder(
+            in_dim=256,
+            hidden_dim=self.hidden_size,
+            rngs=params.rngs,
+            param_dtype=params.param_dtype,
+        )
+        self.vector_in = MLPEmbedder(
+            params.vec_in_dim,
+            self.hidden_size,
+            rngs=params.rngs,
+            param_dtype=params.param_dtype,
+        )
         self.guidance_in = (
             MLPEmbedder(in_dim=256, hidden_dim=self.hidden_size)
             if params.guidance_embed
@@ -109,7 +120,13 @@ class Flux(nnx.Module):
             ]
         )
 
-        self.final_layer = LastLayer(self.hidden_size, 1, self.out_channels)
+        self.final_layer = LastLayer(
+            self.hidden_size,
+            1,
+            self.out_channels,
+            rngs=params.rngs,
+            param_dtype=params.param_dtype,
+        )
 
     def __call__(
         self,
@@ -136,14 +153,14 @@ class Flux(nnx.Module):
         vec = vec + self.vector_in(y)
         txt = self.txt_in(txt)
 
-        ids = jnp.concatenate((txt_ids, img_ids), dim=1)
+        ids = jnp.concatenate((txt_ids, img_ids), axis=1)
         pe = self.pe_embedder(ids)
 
-        for block in self.double_blocks:
+        for block in self.double_blocks.layers:
             img, txt = block(img=img, txt=txt, vec=vec, pe=pe)
 
-        img = jnp.concatenate((txt, img), 1)
-        for block in self.single_blocks:
+        img = jnp.concatenate((txt, img), axis=1)
+        for block in self.single_blocks.layers:
             img = block(img, vec=vec, pe=pe)
         img = img[:, txt.shape[1] :, ...]
 

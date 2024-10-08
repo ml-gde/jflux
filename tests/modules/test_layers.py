@@ -1,19 +1,27 @@
 import jax.numpy as jnp
 import numpy as np
+import jax
 import torch
-from einops import rearrange
+from einops import rearrange, repeat
 from flax import nnx
 from flux.modules.layers import DoubleStreamBlock as TorchDoubleStreamBlock
 from flux.modules.layers import MLPEmbedder as TorchMLPEmbedder
 from flux.modules.layers import Modulation as TorchModulation
 from flux.modules.layers import QKNorm as TorchQKNorm
 from flux.modules.layers import RMSNorm as TorchRMSNorm
+from flux.modules.layers import SelfAttention as TorchSelfAttention
+from flux.modules.layers import timestep_embedding as torch_timesetp_embedding
+from flux.modules.layers import EmbedND as TorchEmbedND
 
 from jflux.modules.layers import DoubleStreamBlock as JaxDoubleStreamBlock
 from jflux.modules.layers import MLPEmbedder as JaxMLPEmbedder
 from jflux.modules.layers import Modulation as JaxModulation
 from jflux.modules.layers import QKNorm as JaxQKNorm
 from jflux.modules.layers import RMSNorm as JaxRMSNorm
+from jflux.modules.layers import SelfAttention as JaxSelfAttention
+from jflux.modules.layers import timestep_embedding as jax_timestep_embedding
+from jflux.modules.layers import EmbedND as JaxEmbedND
+
 from tests.utils import torch2jax
 
 
@@ -64,11 +72,96 @@ def port_modulation(
     return jax_modulation
 
 
+def port_self_attention(
+    jax_self_attention: JaxSelfAttention,
+    torch_self_attention: TorchSelfAttention,
+):
+    jax_self_attention.qkv.kernel.value = torch2jax(
+        rearrange(torch_self_attention.qkv.weight, "i o -> o i")
+    )
+
+    jax_self_attention.qkv.bias.value = torch2jax(torch_self_attention.qkv.bias)
+
+    jax_self_attention.proj.kernel.value = torch2jax(
+        rearrange(torch_self_attention.proj.weight, "i o -> o i")
+    )
+
+    jax_self_attention.proj.bias.value = torch2jax(torch_self_attention.proj.bias)
+
+    return jax_self_attention
+
+
+def port_double_stream_block(
+    jax_double_stream_block: JaxDoubleStreamBlock,
+    torch_double_stream_block: TorchDoubleStreamBlock,
+):
+    jax_double_stream_block.img_mod = port_modulation(
+        jax_modulation=jax_double_stream_block.img_mod,
+        torch_modulation=torch_double_stream_block.img_mod,
+    )
+
+    jax_double_stream_block.img_attn = port_self_attention(
+        jax_self_attention=jax_double_stream_block.img_attn,
+        torch_self_attention=torch_double_stream_block.img_attn,
+    )
+
+    jax_double_stream_block.img_mlp.layers[0].kernel.value = torch2jax(
+        rearrange(torch_double_stream_block.img_mlp[0].weight, "i o -> o i")
+    )
+    jax_double_stream_block.img_mlp.layers[0].bias.value = torch2jax(
+        torch_double_stream_block.img_mlp[0].bias
+    )
+
+    jax_double_stream_block.img_mlp.layers[2].kernel.value = torch2jax(
+        rearrange(torch_double_stream_block.img_mlp[2].weight, "i o -> o i")
+    )
+    jax_double_stream_block.img_mlp.layers[2].bias.value = torch2jax(
+        torch_double_stream_block.img_mlp[2].bias
+    )
+
+    jax_double_stream_block.txt_mod = port_modulation(
+        jax_modulation=jax_double_stream_block.txt_mod,
+        torch_modulation=torch_double_stream_block.txt_mod,
+    )
+
+    jax_double_stream_block.txt_attn = port_self_attention(
+        jax_self_attention=jax_double_stream_block.txt_attn,
+        torch_self_attention=torch_double_stream_block.txt_attn,
+    )
+
+    jax_double_stream_block.txt_mlp.layers[0].kernel.value = torch2jax(
+        rearrange(torch_double_stream_block.txt_mlp[0].weight, "i o -> o i")
+    )
+    jax_double_stream_block.txt_mlp.layers[0].bias.value = torch2jax(
+        torch_double_stream_block.txt_mlp[0].bias
+    )
+
+    jax_double_stream_block.txt_mlp.layers[2].kernel.value = torch2jax(
+        rearrange(torch_double_stream_block.txt_mlp[2].weight, "i o -> o i")
+    )
+    jax_double_stream_block.txt_mlp.layers[2].bias.value = torch2jax(
+        torch_double_stream_block.txt_mlp[2].bias
+    )
+
+    return jax_double_stream_block
+
+
 class LayersTestCase(np.testing.TestCase):
+    def test_timestep_embedding(self):
+        t_vec_torch = torch.tensor([1.0], dtype=torch.float32)
+        t_vec_jax = jnp.array([1.0], dtype=jnp.float32)
+
+        jax_output = jax_timestep_embedding(t=t_vec_jax, dim=256)
+        torch_output = torch_timesetp_embedding(t=t_vec_torch, dim=256)
+        print(jax_output.shape)
+        np.testing.assert_allclose(
+            np.array(jax_output), torch_output.numpy(), atol=1e-4, rtol=1e-4
+        )
+
     def test_mlp_embedder(self):
         # Initialize layers
-        in_dim = 32
-        hidden_dim = 64
+        in_dim = 256
+        hidden_dim = 3072
         rngs = nnx.Rngs(default=42)
         param_dtype = jnp.float32
 
@@ -89,7 +182,7 @@ class LayersTestCase(np.testing.TestCase):
         )
 
         # Generate random inputs
-        np_input = np.random.randn(2, in_dim).astype(np.float32)
+        np_input = np.random.randn(1, in_dim).astype(np.float32)
         jax_input = jnp.array(np_input, dtype=jnp.float32)
         torch_input = torch.from_numpy(np_input).to(torch.float32)
 
@@ -235,10 +328,10 @@ class LayersTestCase(np.testing.TestCase):
 
     def test_double_stream_block(self):
         # Initialize layer
-        hidden_size = 64
-        num_heads = 8
+        hidden_size = 3072
+        num_heads = 24
         mlp_ratio = 4.0
-        qkv_bias = False
+        qkv_bias = True
         rngs = nnx.Rngs(default=42)
         param_dtype = jnp.float32
 
@@ -247,7 +340,7 @@ class LayersTestCase(np.testing.TestCase):
             hidden_size=hidden_size,
             num_heads=num_heads,
             mlp_ratio=mlp_ratio,
-            qkv_bias=qkv_bias
+            qkv_bias=qkv_bias,
         )
         jax_double_stream_block = JaxDoubleStreamBlock(
             hidden_size=hidden_size,
@@ -258,11 +351,16 @@ class LayersTestCase(np.testing.TestCase):
             param_dtype=param_dtype,
         )
 
+        jax_double_stream_block = port_double_stream_block(
+            jax_double_stream_block=jax_double_stream_block,
+            torch_double_stream_block=torch_double_stream_block,
+        )
+
         # Create the dummy inputs
-        np_img = np.random.randn(2, 10, hidden_size).astype(np.float32)  # Batch size 2, sequence length 10, hidden size 64 (image input)
-        np_txt = np.random.randn(2, 15, hidden_size).astype(np.float32)  # Batch size 2, sequence length 15, hidden size 64 (text input)
-        np_vec = np.random.randn(2, hidden_size).astype(np.float32)      # Batch size 2, hidden size 64 (modulation vector)
-        np_pe = np.random.randn(2, 25, hidden_size).astype(np.float32)   # Batch size 2, total length 25 (10 + 15), hidden size 64 (positional embedding)
+        np_img = np.random.randn(1, 4080, hidden_size).astype(np.float32)
+        np_txt = np.random.randn(1, 256, hidden_size).astype(np.float32)
+        np_vec = np.random.randn(1, hidden_size).astype(np.float32)
+        np_pe = np.random.randn(1, 1, 4336, 64, 2, 2).astype(np.float32)
 
         jax_img = jnp.array(np_img, dtype=jnp.float32)
         jax_txt = jnp.array(np_txt, dtype=jnp.float32)
@@ -287,3 +385,29 @@ class LayersTestCase(np.testing.TestCase):
             vec=jax_vec,
             pe=jax_pe,
         )
+
+    def test_embednd(self):
+        # noise
+        bs, c, h, w = (1, 16, 96, 170)
+
+        img_ids = jnp.zeros((h // 2, w // 2, 3))
+        img_ids = img_ids.at[..., 1].set(jnp.arange(h // 2)[:, None])
+        img_ids = img_ids.at[..., 2].set(jnp.arange(w // 2)[None, :])
+        img_ids = repeat(img_ids, "h w c -> b (h w) c", b=bs)
+
+        # noise reshapes
+        # img = jax.random.normal(shape=(1, 4080, 64), key=key, dtype=dtype)
+
+        # prompt embedded from t5
+        # txt = jax.random.normal(shape=(1, 512, 4096), key=key, dtype=dtype)
+        txt_ids = jnp.zeros((bs, 512, 3))
+
+        # clip embeddings
+        # vec = jax.random.normal(shape=(1, 768), key=key, dtype=dtype)
+
+        ids = jnp.concatenate((txt_ids, img_ids), axis=1)
+
+        pe = JaxEmbedND(dim=128, theta=10_000, axes_dim=[16, 56, 56])(
+            ids
+        )  # dim = hidden_dim/num_head
+        print(pe.shape)  # (1, 1, 4592, 64, 2, 2)

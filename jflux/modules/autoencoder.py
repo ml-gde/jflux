@@ -524,14 +524,27 @@ class AutoEncoder(nnx.Module):
         self.shift_factor = params.shift_factor
 
     def encode(self, x: Array) -> Array:
+        # rearrange for jax
+        x = rearrange(x, "b c h w -> b h w c")
+
         z = self.reg(self.encoder(x))
         z = self.scale_factor * (z - self.shift_factor)
+
+        # rearrange for jax
+        z = rearrange(z, "b h w c -> b c h w")
         return z
 
     def decode(self, z: Array) -> Array:
+        # rearrange for jax
+        z = rearrange(z, "b c h w -> b h w c")
+
         z = z / self.scale_factor + self.shift_factor
-        return self.decoder(z)
+        z = self.decoder(z)
+
+        # rearrange for jax
+        z = rearrange(z, "b h w c -> b c h w")
+        return z
 
     def __call__(self, x: Array) -> Array:
-        # x -> (b, h, w, c)
+        # x -> (b, c, h, w)
         return self.decode(self.encode(x))
