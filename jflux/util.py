@@ -136,10 +136,10 @@ def load_flow_model(name: str, hf_download: bool = True) -> Flux:
     return model
 
 
-def load_t5(max_length: int = 512) -> HFEmbedder:
+def load_t5() -> HFEmbedder:
     device = "cuda" if torch.cuda.is_available() else "cpu"
     return HFEmbedder(
-        "google/t5-v1_1-xxl", max_length=max_length, torch_dtype=torch.bfloat16
+        "google/t5-v1_1-xxl", max_length=512, torch_dtype=torch.bfloat16
     ).to(device)
 
 
