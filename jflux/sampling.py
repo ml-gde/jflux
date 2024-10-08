@@ -62,19 +62,8 @@ def prepare(
     }
 
 
-def time_shift(mu: float, sigma: float, timesteps: Array) -> Array:
-    """
-    Shift the timesteps
-
-    Args:
-        mu (float): Estimated mu
-        sigma (float): Sigma
-        timesteps (Array): Timesteps
-
-    Returns:
-        Array: Shifted timesteps
-    """
-    return jnp.exp(mu) / (jnp.exp(mu) + (1 / timesteps - 1) ** sigma)
+def time_shift(mu: float, sigma: float, t: Array):
+    return math.exp(mu) / (math.exp(mu) + (1 / t - 1) ** sigma)
 
 
 def get_lin_function(

@@ -153,14 +153,14 @@ class Flux(nnx.Module):
         vec = vec + self.vector_in(y)
         txt = self.txt_in(txt)
 
-        ids = jnp.concatenate((txt_ids, img_ids), dim=1)
+        ids = jnp.concatenate((txt_ids, img_ids), axis=1)
         pe = self.pe_embedder(ids)
 
-        for block in self.double_blocks:
+        for block in self.double_blocks.layers:
             img, txt = block(img=img, txt=txt, vec=vec, pe=pe)
 
         img = jnp.concatenate((txt, img), 1)
-        for block in self.single_blocks:
+        for block in self.single_blocks.layers:
             img = block(img, vec=vec, pe=pe)
         img = img[:, txt.shape[1] :, ...]
 
