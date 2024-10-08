@@ -1,5 +1,6 @@
 import jax.numpy as jnp
 import numpy as np
+import jax
 import torch
 from einops import rearrange
 from flax import nnx
@@ -9,6 +10,7 @@ from flux.modules.layers import Modulation as TorchModulation
 from flux.modules.layers import QKNorm as TorchQKNorm
 from flux.modules.layers import RMSNorm as TorchRMSNorm
 from flux.modules.layers import SelfAttention as TorchSelfAttention
+from flux.modules.layers import timestep_embedding as torch_timesetp_embedding
 
 from jflux.modules.layers import DoubleStreamBlock as JaxDoubleStreamBlock
 from jflux.modules.layers import MLPEmbedder as JaxMLPEmbedder
@@ -16,6 +18,8 @@ from jflux.modules.layers import Modulation as JaxModulation
 from jflux.modules.layers import QKNorm as JaxQKNorm
 from jflux.modules.layers import RMSNorm as JaxRMSNorm
 from jflux.modules.layers import SelfAttention as JaxSelfAttention
+from jflux.modules.layers import timestep_embedding as jax_timestep_embedding
+
 from tests.utils import torch2jax
 
 
@@ -141,10 +145,21 @@ def port_double_stream_block(
 
 
 class LayersTestCase(np.testing.TestCase):
+    def test_timestep_embedding(self):
+        t_vec_torch = torch.tensor([1.0], dtype=torch.float32)
+        t_vec_jax = jnp.array([1.0], dtype=jnp.float32)
+
+        jax_output = jax_timestep_embedding(t=t_vec_jax, dim=256)
+        torch_output = torch_timesetp_embedding(t=t_vec_torch, dim=256)
+        print(jax_output.shape)
+        np.testing.assert_allclose(
+            np.array(jax_output), torch_output.numpy(), atol=1e-4, rtol=1e-4
+        )
+
     def test_mlp_embedder(self):
         # Initialize layers
-        in_dim = 32
-        hidden_dim = 64
+        in_dim = 256
+        hidden_dim = 3072
         rngs = nnx.Rngs(default=42)
         param_dtype = jnp.float32
 
@@ -165,7 +180,7 @@ class LayersTestCase(np.testing.TestCase):
         )
 
         # Generate random inputs
-        np_input = np.random.randn(2, in_dim).astype(np.float32)
+        np_input = np.random.randn(1, in_dim).astype(np.float32)
         jax_input = jnp.array(np_input, dtype=jnp.float32)
         torch_input = torch.from_numpy(np_input).to(torch.float32)
 
