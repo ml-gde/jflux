@@ -10,6 +10,9 @@ from flax import nnx
 from fire import Fire
 from jax.typing import DTypeLike
 
+from PIL import Image
+
+from einops import rearrange
 from jflux.sampling import denoise, get_noise, get_schedule, prepare, unpack
 from jflux.util import configs, load_ae, load_clip, load_flow_model, load_t5
 
@@ -192,7 +195,6 @@ def main(
             shift=(name != "flux-schnell"),
         )
 
-        import sys; sys.exit(0)
         # denoise initial noise
         x = denoise(
             model=model,
@@ -205,20 +207,22 @@ def main(
             guidance=opts.guidance,
         )
 
-        # offload model, load autoencoder to gpu
-        # TODO: JAX variant of offloading to CPU
-        # if offload:
-        #     model.cpu()
-        #     torch.cuda.empty_cache()
-        #     ae.decoder.to(x.device)
-
         # decode latents to pixel space
-        x = unpack(x.astype(jnp.float32), opts.height, opts.width)
-        x = ae.decode(x).astype(dtype=jax.dtypes.bfloat16)  # noqa
+        x = unpack(
+            x=x.astype(jnp.float32),
+            height=opts.height,
+            width=opts.width
+        )
+        x = ae.decode(x)
         t1 = time.perf_counter()
 
         fn = output_name.format(idx=idx)
         print(f"Done in {t1 - t0:.1f}s. Saving {fn}")
+        # bring into PIL format and save
+        x = x.clip(-1, 1)
+        x = rearrange(x[0], "c h w -> h w c")
+
+        img = Image.fromarray((127.5 * (x + 1.0)))
 
         if loop:
             print("-" * 80)

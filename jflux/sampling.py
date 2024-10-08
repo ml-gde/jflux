@@ -137,17 +137,6 @@ def denoise(
 
 
 def unpack(x: Array, height: int, width: int) -> Array:
-    """
-    Unpack the image tensor
-
-    Args:
-        x (Array): Input tensor
-        height (int): Height of the image
-        width (int): Width of the image
-
-    Returns:
-        Array: Unpacked image tensor
-    """
     return rearrange(
         x,
         "b (h w) (c ph pw) -> b c (h ph) (w pw)",
