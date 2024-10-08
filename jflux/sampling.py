@@ -2,7 +2,7 @@ import math
 from typing import Callable
 
 import jax
-from chex import Array, Device, PRNGKey
+from chex import Array
 from einops import rearrange, repeat
 from jax import numpy as jnp
 from jax.image import ResizeMethod
@@ -120,7 +120,7 @@ def denoise(
     # this is ignored for schnell
     guidance_vec = jnp.full((img.shape[0],), guidance, dtype=img.dtype)
     for t_curr, t_prev in zip(timesteps[:-1], timesteps[1:]):
-        t_vec = jnp.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
+        t_vec = jnp.full((img.shape[0],), t_curr, dtype=img.dtype)
         pred = model(
             img=img,
             img_ids=img_ids,

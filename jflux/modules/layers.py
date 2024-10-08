@@ -47,10 +47,8 @@ def timestep_embedding(
     half = dim // 2
 
     freqs = jnp.exp(
-        -math.log(max_period)
-        * jnp.arange(start=0, stop=half, dtype=jnp.float32, device=t.device)
-        / half
-    ).astype(dtype=t.device)
+        -math.log(max_period) * jnp.arange(start=0, stop=half, dtype=jnp.float32) / half
+    ).astype(dtype=t.dtype)
 
     args = t[:, None].astype(jnp.float32) * freqs[None]
     embedding = jnp.concat([jnp.cos(args), jnp.sin(args)], axis=-1)
@@ -58,8 +56,8 @@ def timestep_embedding(
     if dim % 2:
         embedding = jnp.concat([embedding, jnp.zeros_like(embedding[:, :1])], axis=-1)
 
-    if jnp.issubdtype(t.device(), jnp.floating):
-        embedding = embedding.astype(t.device())
+    if jnp.issubdtype(t.dtypee, jnp.floating):
+        embedding = embedding.astype(t.dtype)
 
     return embedding
 
@@ -121,7 +119,7 @@ class QKNorm(nnx.Module):
     def __call__(self, q: Array, k: Array, v: Array) -> tuple[Array, Array]:
         q = self.query_norm(q)
         k = self.key_norm(k)
-        return q.to_device(v.device), k.to_device(v.device)
+        return q, k
 
 
 class SelfAttention(nnx.Module):

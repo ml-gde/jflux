@@ -120,7 +120,13 @@ class Flux(nnx.Module):
             ]
         )
 
-        self.final_layer = LastLayer(self.hidden_size, 1, self.out_channels)
+        self.final_layer = LastLayer(
+            self.hidden_size,
+            1,
+            self.out_channels,
+            rngs=params.rngs,
+            param_dtype=params.param_dtype,
+        )
 
     def __call__(
         self,

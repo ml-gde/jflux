@@ -33,5 +33,5 @@ class SamplingTestCase(chex.TestCase):
             seed=42,
             device="cuda",
         )
-
+        print(x_jax.shape)
         chex.assert_equal_shape([x_jax, x_torch])
