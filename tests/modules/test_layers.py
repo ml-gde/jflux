@@ -2,7 +2,7 @@ import jax.numpy as jnp
 import numpy as np
 import jax
 import torch
-from einops import rearrange
+from einops import rearrange, repeat
 from flax import nnx
 from flux.modules.layers import DoubleStreamBlock as TorchDoubleStreamBlock
 from flux.modules.layers import MLPEmbedder as TorchMLPEmbedder
@@ -11,6 +11,7 @@ from flux.modules.layers import QKNorm as TorchQKNorm
 from flux.modules.layers import RMSNorm as TorchRMSNorm
 from flux.modules.layers import SelfAttention as TorchSelfAttention
 from flux.modules.layers import timestep_embedding as torch_timesetp_embedding
+from flux.modules.layers import EmbedND as TorchEmbedND
 
 from jflux.modules.layers import DoubleStreamBlock as JaxDoubleStreamBlock
 from jflux.modules.layers import MLPEmbedder as JaxMLPEmbedder
@@ -19,6 +20,7 @@ from jflux.modules.layers import QKNorm as JaxQKNorm
 from jflux.modules.layers import RMSNorm as JaxRMSNorm
 from jflux.modules.layers import SelfAttention as JaxSelfAttention
 from jflux.modules.layers import timestep_embedding as jax_timestep_embedding
+from jflux.modules.layers import EmbedND as JaxEmbedND
 
 from tests.utils import torch2jax
 
@@ -383,3 +385,27 @@ class LayersTestCase(np.testing.TestCase):
             vec=jax_vec,
             pe=jax_pe,
         )
+
+    def test_embednd(self):
+        # noise
+        bs, c, h, w = (1, 16, 96, 170)
+
+        img_ids = jnp.zeros((h // 2, w // 2, 3))
+        img_ids = img_ids.at[..., 1].set(jnp.arange(h // 2)[:, None])
+        img_ids = img_ids.at[..., 2].set(jnp.arange(w // 2)[None, :])
+        img_ids = repeat(img_ids, "h w c -> b (h w) c", b=bs)
+
+        # noise reshapes
+        # img = jax.random.normal(shape=(1, 4080, 64), key=key, dtype=dtype)
+
+        # prompt embedded from t5
+        # txt = jax.random.normal(shape=(1, 512, 4096), key=key, dtype=dtype)
+        txt_ids = jnp.zeros((bs, 512, 3))
+
+        # clip embeddings
+        # vec = jax.random.normal(shape=(1, 768), key=key, dtype=dtype)
+
+        ids = jnp.concatenate((txt_ids, img_ids), axis=1)
+
+        pe = JaxEmbedND(dim=128, theta=10_000, axes_dim=[16, 56, 56])(ids)  # dim = hidden_dim/num_head
+        print(pe.shape)
