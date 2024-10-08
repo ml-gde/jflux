@@ -8,12 +8,14 @@ from flux.modules.layers import MLPEmbedder as TorchMLPEmbedder
 from flux.modules.layers import Modulation as TorchModulation
 from flux.modules.layers import QKNorm as TorchQKNorm
 from flux.modules.layers import RMSNorm as TorchRMSNorm
+from flux.modules.layers import SelfAttention as TorchSelfAttention
 
 from jflux.modules.layers import DoubleStreamBlock as JaxDoubleStreamBlock
 from jflux.modules.layers import MLPEmbedder as JaxMLPEmbedder
 from jflux.modules.layers import Modulation as JaxModulation
 from jflux.modules.layers import QKNorm as JaxQKNorm
 from jflux.modules.layers import RMSNorm as JaxRMSNorm
+from jflux.modules.layers import SelfAttention as JaxSelfAttention
 from tests.utils import torch2jax
 
 
@@ -62,6 +64,80 @@ def port_modulation(
     )
     jax_modulation.lin.bias.value = torch2jax(torch_modulation.lin.bias)
     return jax_modulation
+
+
+def port_self_attention(
+    jax_self_attention: JaxSelfAttention,
+    torch_self_attention: TorchSelfAttention,
+):
+    jax_self_attention.qkv.kernel.value = torch2jax(
+        rearrange(torch_self_attention.qkv.weight, "i o -> o i")
+    )
+
+    jax_self_attention.qkv.bias.value = torch2jax(torch_self_attention.qkv.bias)
+
+    jax_self_attention.proj.kernel.value = torch2jax(
+        rearrange(torch_self_attention.proj.weight, "i o -> o i")
+    )
+
+    jax_self_attention.proj.bias.value = torch2jax(torch_self_attention.proj.bias)
+
+    return jax_self_attention
+
+
+def port_double_stream_block(
+    jax_double_stream_block: JaxDoubleStreamBlock,
+    torch_double_stream_block: TorchDoubleStreamBlock,
+):
+    jax_double_stream_block.img_mod = port_modulation(
+        jax_modulation=jax_double_stream_block.img_mod,
+        torch_modulation=torch_double_stream_block.img_mod,
+    )
+
+    jax_double_stream_block.img_attn = port_self_attention(
+        jax_self_attention=jax_double_stream_block.img_attn,
+        torch_self_attention=torch_double_stream_block.img_attn,
+    )
+
+    jax_double_stream_block.img_mlp.layers[0].kernel.value = torch2jax(
+        rearrange(torch_double_stream_block.img_mlp[0].weight, "i o -> o i")
+    )
+    jax_double_stream_block.img_mlp.layers[0].bias.value = torch2jax(
+        torch_double_stream_block.img_mlp[0].bias
+    )
+
+    jax_double_stream_block.img_mlp.layers[2].kernel.value = torch2jax(
+        rearrange(torch_double_stream_block.img_mlp[2].weight, "i o -> o i")
+    )
+    jax_double_stream_block.img_mlp.layers[2].bias.value = torch2jax(
+        torch_double_stream_block.img_mlp[2].bias
+    )
+
+    jax_double_stream_block.txt_mod = port_modulation(
+        jax_modulation=jax_double_stream_block.txt_mod,
+        torch_modulation=torch_double_stream_block.txt_mod,
+    )
+
+    jax_double_stream_block.txt_attn = port_self_attention(
+        jax_self_attention=jax_double_stream_block.txt_attn,
+        torch_self_attention=torch_double_stream_block.txt_attn,
+    )
+
+    jax_double_stream_block.txt_mlp.layers[0].kernel.value = torch2jax(
+        rearrange(torch_double_stream_block.txt_mlp[0].weight, "i o -> o i")
+    )
+    jax_double_stream_block.txt_mlp.layers[0].bias.value = torch2jax(
+        torch_double_stream_block.txt_mlp[0].bias
+    )
+
+    jax_double_stream_block.txt_mlp.layers[2].kernel.value = torch2jax(
+        rearrange(torch_double_stream_block.txt_mlp[2].weight, "i o -> o i")
+    )
+    jax_double_stream_block.txt_mlp.layers[2].bias.value = torch2jax(
+        torch_double_stream_block.txt_mlp[2].bias
+    )
+
+    return jax_double_stream_block
 
 
 class LayersTestCase(np.testing.TestCase):
@@ -186,8 +262,6 @@ class LayersTestCase(np.testing.TestCase):
             atol=1e-5,
         )
 
-    # TODO (SauravMaheshkar): Add test for SelfAttention Module
-
     def test_modulation(self):
         # Initialize the layer
         dim = 4
@@ -237,10 +311,10 @@ class LayersTestCase(np.testing.TestCase):
 
     def test_double_stream_block(self):
         # Initialize layer
-        hidden_size = 64
-        num_heads = 8
+        hidden_size = 3072
+        num_heads = 24
         mlp_ratio = 4.0
-        qkv_bias = False
+        qkv_bias = True
         rngs = nnx.Rngs(default=42)
         param_dtype = jnp.float32
 
@@ -260,21 +334,16 @@ class LayersTestCase(np.testing.TestCase):
             param_dtype=param_dtype,
         )
 
+        jax_double_stream_block = port_double_stream_block(
+            jax_double_stream_block=jax_double_stream_block,
+            torch_double_stream_block=torch_double_stream_block,
+        )
+
         # Create the dummy inputs
-        np_img = np.random.randn(2, 10, hidden_size).astype(
-            np.float32
-        )  # Batch size 2, sequence length 10, hidden size 64 (image input)
-        np_txt = np.random.randn(2, 15, hidden_size).astype(
-            np.float32
-        )  # Batch size 2, sequence length 15, hidden size 64 (text input)
-        np_vec = np.random.randn(2, hidden_size).astype(
-            np.float32
-        )  # Batch size 2, hidden size 64 (modulation vector)
-        np_pe = np.random.randn(
-            2, 25, hidden_size
-        ).astype(
-            np.float32
-        )  # Batch size 2, total length 25 (10 + 15), hidden size 64 (positional embedding)
+        np_img = np.random.randn(1, 4080, hidden_size).astype(np.float32)
+        np_txt = np.random.randn(1, 256, hidden_size).astype(np.float32)
+        np_vec = np.random.randn(1, hidden_size).astype(np.float32)
+        np_pe = np.random.randn(1, 1, 4336, 64, 2, 2).astype(np.float32)
 
         jax_img = jnp.array(np_img, dtype=jnp.float32)
         jax_txt = jnp.array(np_txt, dtype=jnp.float32)
