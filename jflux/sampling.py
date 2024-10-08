@@ -37,9 +37,9 @@ def prepare(
     if img.shape[0] == 1 and bs > 1:
         img = repeat(img, "1 ... -> bs ...", bs=bs)
 
-    img_ids = jnp.zeros(h // 2, w // 2, 3)
-    img_ids[..., 1] = img_ids[..., 1] + jnp.arange(h // 2)[:, None]
-    img_ids[..., 2] = img_ids[..., 2] + jnp.arange(w // 2)[None, :]
+    img_ids = jnp.zeros((h // 2, w // 2, 3))
+    img_ids = img_ids.at[..., 1].set(jnp.arange(h // 2)[:, None])
+    img_ids = img_ids.at[..., 2].set(jnp.arange(w // 2)[None, :])
     img_ids = repeat(img_ids, "h w c -> b (h w) c", b=bs)
 
     if isinstance(prompt, str):
@@ -47,7 +47,7 @@ def prepare(
     txt = t5(prompt)
     if txt.shape[0] == 1 and bs > 1:
         txt = repeat(txt, "1 ... -> bs ...", bs=bs)
-    txt_ids = jnp.zeros(bs, txt.shape[1], 3)
+    txt_ids = jnp.zeros((bs, txt.shape[1], 3))
 
     vec = clip(prompt)
     if vec.shape[0] == 1 and bs > 1:

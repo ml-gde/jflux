@@ -173,7 +173,6 @@ def main(
 
     while opts is not None:
         if opts.seed is None:
-            # TODO (ariG23498): Use a random seed
             opts.seed = jax.random.PRNGKey(seed=42)
         print(f"Generating with seed {opts.seed}:\n{opts.prompt}")
         t0 = time.perf_counter()
@@ -208,11 +207,7 @@ def main(
         )
 
         # decode latents to pixel space
-        x = unpack(
-            x=x.astype(jnp.float32),
-            height=opts.height,
-            width=opts.width
-        )
+        x = unpack(x=x.astype(jnp.float32), height=opts.height, width=opts.width)
         x = ae.decode(x)
         t1 = time.perf_counter()
 

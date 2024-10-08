@@ -6,6 +6,7 @@ from jflux.sampling import get_noise as jax_get_noise
 
 from flux.sampling import get_noise as torch_get_noise
 
+
 class SamplingTestCase(chex.TestCase):
     def test_get_noise(self):
         # for schnell
@@ -30,7 +31,7 @@ class SamplingTestCase(chex.TestCase):
             width=width,
             dtype=torch.bfloat16,
             seed=42,
-            device="cuda"
+            device="cuda",
         )
 
         chex.assert_equal_shape([x_jax, x_torch])
