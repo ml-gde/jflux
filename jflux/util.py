@@ -13,7 +13,7 @@ from jflux.model import Flux, FluxParams
 from jflux.modules.autoencoder import AutoEncoder, AutoEncoderParams
 from jflux.modules.conditioner import HFEmbedder
 
-from port import port_autoencoder, port_flux
+from jflux.port import port_autoencoder, port_flux
 
 
 @dataclass
@@ -135,6 +135,7 @@ def load_flow_model(name: str, hf_download: bool = True) -> Flux:
                 tensors[k] = f.get_tensor(k)
 
         model = port_flux(flux=model, tensors=tensors)
+        del tensors
     return model
 
 
@@ -173,4 +174,5 @@ def load_ae(name: str, hf_download: bool = True) -> AutoEncoder:
                 tensors[k] = f.get_tensor(k)
 
         ae = port_autoencoder(autoencoder=ae, tensors=tensors)
+        del tensors
     return ae
