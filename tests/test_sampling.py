@@ -1,6 +1,5 @@
 import chex
 import jax
-import numpy as np
 import torch
 from flux.sampling import get_noise as torch_get_noise
 

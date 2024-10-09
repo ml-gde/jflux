@@ -1,11 +1,9 @@
-import jax
 import jax.numpy as jnp
 import numpy as np
 import torch
 from einops import rearrange, repeat
 from flax import nnx
 from flux.modules.layers import DoubleStreamBlock as TorchDoubleStreamBlock
-from flux.modules.layers import EmbedND as TorchEmbedND
 from flux.modules.layers import MLPEmbedder as TorchMLPEmbedder
 from flux.modules.layers import Modulation as TorchModulation
 from flux.modules.layers import QKNorm as TorchQKNorm
@@ -387,7 +385,7 @@ class LayersTestCase(np.testing.TestCase):
 
     def test_embednd(self):
         # noise
-        bs, c, h, w = (1, 16, 96, 170)
+        bs, _, h, w = (1, 16, 96, 170)
 
         img_ids = jnp.zeros((h // 2, w // 2, 3))
         img_ids = img_ids.at[..., 1].set(jnp.arange(h // 2)[:, None])

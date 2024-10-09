@@ -591,8 +591,8 @@ class AutoEncodersTestCase(np.testing.TestCase):
             z_channels=z_channels,
             scale_factor=scale_factor,
             shift_factor=shift_factor,
-            rngs=nnx.Rngs(default=42),
-            param_dtype=jnp.float32,
+            rngs=rngs,
+            param_dtype=param_dtype,
         )
 
         torch_autoencoder = TorchAutoEncoder(params=torch_params)
