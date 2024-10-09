@@ -49,7 +49,7 @@ class Flux(nnx.Module):
         self.out_channels = self.in_channels
         if params.hidden_size % params.num_heads != 0:
             raise ValueError(
-                f"Hidden size {params.hidden_size} must be divisible by num_heads {params.num_heads}"
+                f"Hidden size {params.hidden_size} must be divisible by num_heads {params.num_heads}"  # noqa: E501
             )
         pe_dim = params.hidden_size // params.num_heads
         if sum(params.axes_dim) != pe_dim:

@@ -12,7 +12,7 @@ $ uv sync
 ## Running
 
 ```shell
-$ uv jflux
+$ uv run jflux
 ```
 
 ## References

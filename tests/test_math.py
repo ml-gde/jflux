@@ -1,20 +1,19 @@
-import unittest
-
+import chex
+import jax
 import jax.numpy as jnp
-import numpy as np
 import torch
 from flux.math import apply_rope as torch_apply_rope
-from flux.math import attention as torch_attention
 from flux.math import rope as torch_rope
 
 from jflux.math import apply_rope as jax_apply_rope
-from jflux.math import attention as jax_attention
 from jflux.math import rope as jax_rope
 
+from .utils import torch2jax
 
-class TestMath(np.testing.TestCase):
+
+class TestMath(chex.TestCase):
     def test_rope(self):
-        B, L, H, D = (
+        B, L, _, D = (
             2,
             4,
             2,
@@ -22,18 +21,24 @@ class TestMath(np.testing.TestCase):
         )  # Batch size, sequence length, number of heads, embedding dimension
         theta = 10000
 
-        np_positions = np.expand_dims(np.arange(L), 0).repeat(B, 1).astype(np.int32)
-        torch_positions = torch.from_numpy(np_positions).to(torch.int32)
-        jax_positions = jnp.array(np_positions, dtype=jnp.int32)
+        jax_positions = jnp.expand_dims(jnp.arange(L, dtype=jnp.int32), axis=0).repeat(
+            B, axis=1
+        )
+        torch_positions = torch.from_numpy(jax_positions.__array__()).to(torch.int32)
 
-        np.testing.assert_allclose(np.array(jax_positions), torch_positions.numpy())
+        chex.assert_trees_all_close(
+            jax_positions,
+            torch2jax(torch_positions),
+            rtol=1e-5,
+            atol=1e-5,
+        )
 
         torch_pe = torch_rope(pos=torch_positions, dim=D, theta=theta)
         jax_pe = jax_rope(pos=jax_positions, dim=D, theta=theta)
 
-        np.testing.assert_allclose(
-            np.array(jax_pe),
-            torch_pe.numpy(),
+        chex.assert_trees_all_close(
+            jax_pe,
+            torch2jax(torch_pe),
             rtol=1e-5,
             atol=1e-5,
         )
@@ -48,31 +53,44 @@ class TestMath(np.testing.TestCase):
         theta = 10000
 
         # Inputs
-        np_q = np.random.randn(B, H, L, D).astype(np.float32)
-        np_k = np.random.randn(B, H, L, D).astype(np.float32)
+        jax_q = jax.random.normal(key=jax.random.PRNGKey(42), shape=(B, H, L, D))
+        jax_k = jax.random.normal(key=jax.random.PRNGKey(42), shape=(B, H, L, D))
 
-        jax_q = jnp.array(np_q, dtype=jnp.float32)
-        jax_k = jnp.array(np_k, dtype=jnp.float32)
+        torch_q = torch.from_numpy(jax_q.__array__()).to(torch.float32)
+        torch_k = torch.from_numpy(jax_k.__array__()).to(torch.float32)
 
-        torch_q = torch.from_numpy(np_q).to(torch.float32)
-        torch_k = torch.from_numpy(np_k).to(torch.float32)
-
-        np.testing.assert_allclose(np.array(jax_q), torch_q.numpy())
-        np.testing.assert_allclose(np.array(jax_k), torch_k.numpy())
+        chex.assert_trees_all_close(
+            jax_q,
+            torch2jax(torch_q),
+            rtol=1e-5,
+            atol=1e-5,
+        )
+        chex.assert_trees_all_close(
+            jax_k,
+            torch2jax(torch_k),
+            rtol=1e-5,
+            atol=1e-5,
+        )
 
         # Position indices (e.g., positions in the sequence)
-        np_positions = np.random.randn(1, L).astype(np.float32)
-        torch_positions = torch.from_numpy(np_positions).to(torch.float32)
-        jax_positions = jnp.array(np_positions, dtype=jnp.float32)
+        jax_positions = jax.random.normal(
+            key=jax.random.PRNGKey(42), shape=(B, L), dtype=jnp.float32
+        )
+        torch_positions = torch.from_numpy(jax_positions.__array__()).to(torch.float32)
 
-        np.testing.assert_allclose(np.array(jax_positions), torch_positions.numpy())
+        chex.assert_trees_all_close(
+            jax_positions,
+            torch2jax(torch_positions),
+            rtol=1e-5,
+            atol=1e-5,
+        )
 
         torch_pe = torch_rope(pos=torch_positions, dim=(3072 // 24), theta=theta)
         jax_pe = jax_rope(pos=jax_positions, dim=(3072 // 24), theta=theta)
 
-        np.testing.assert_allclose(
-            np.array(jax_pe),
-            torch_pe.numpy(),
+        chex.assert_trees_all_close(
+            jax_pe,
+            torch2jax(torch_pe),
             rtol=1e-5,
             atol=1e-5,
         )
@@ -90,51 +108,16 @@ class TestMath(np.testing.TestCase):
             xq=jax_q, xk=jax_k, freqs_cis=jax_pe
         )
 
-        np.testing.assert_allclose(
-            np.array(jax_q_rotated),
-            torch_q_rotated.numpy(),
-            rtol=1e-5,
-            atol=1e-5,
-        )
-        np.testing.assert_allclose(
-            np.array(jax_k_rotated),
-            torch_k_rotated.numpy(),
+        chex.assert_trees_all_close(
+            jax_q_rotated,
+            torch2jax(torch_q_rotated),
             rtol=1e-5,
             atol=1e-5,
         )
 
-    # def test_attention(self):
-    #     # Generate random inputs
-    #     np_input = np.random.randn(2, 32, 4, 4).astype(np.float32)
-    #     jax_input = jnp.array(np_input, dtype=jnp.float32)
-    #     torch_input = torch.from_numpy(np_input).to(torch.float32)
-
-    #     np.testing.assert_allclose(np.array(jax_input), torch_input.numpy())
-
-    #     # Forward pass
-    #     torch_output = torch_downsample(torch_input)
-    #     jax_output = jax_downsample(rearrange(jax_input, "b c h w -> b h w c"))
-
-    #     # Assertions
-    #     np.testing.assert_allclose(
-    #         np.array(rearrange(jax_output, "b h w c -> b c h w")),
-    #         torch_output.detach().numpy(),
-    #         rtol=1e-5,
-    #         atol=1e-5,
-    #     )
-
-    # @pytest.mark.xfail
-    # def test_attention(self):
-    #     pos = jnp.expand_dims(jnp.arange(self.seq_len), axis=0)
-    #     pos = jnp.repeat(pos, self.batch_size, axis=0)
-
-    #     freqs_cis = rope(pos, self.dim, self.theta)
-    #     attention_output = attention(self.q, self.k, self.v, freqs_cis)
-
-    #     expected_shape = (self.batch_size, self.seq_len, self.num_heads * self.dim)
-
-    #     self.assertEqual(
-    #         attention_output.shape,
-    #         expected_shape,
-    #         "attention function output shape is incorrect",
-    #     )
+        chex.assert_trees_all_close(
+            jax_k_rotated,
+            torch2jax(torch_k_rotated),
+            rtol=1e-5,
+            atol=1e-5,
+        )

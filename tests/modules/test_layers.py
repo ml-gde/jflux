@@ -1,11 +1,10 @@
+import chex
 import jax
 import jax.numpy as jnp
-import numpy as np
 import torch
 from einops import rearrange, repeat
 from flax import nnx
 from flux.modules.layers import DoubleStreamBlock as TorchDoubleStreamBlock
-from flux.modules.layers import EmbedND as TorchEmbedND
 from flux.modules.layers import MLPEmbedder as TorchMLPEmbedder
 from flux.modules.layers import Modulation as TorchModulation
 from flux.modules.layers import QKNorm as TorchQKNorm
@@ -145,16 +144,19 @@ def port_double_stream_block(
     return jax_double_stream_block
 
 
-class LayersTestCase(np.testing.TestCase):
+class LayersTestCase(chex.TestCase):
     def test_timestep_embedding(self):
         t_vec_torch = torch.tensor([1.0], dtype=torch.float32)
         t_vec_jax = jnp.array([1.0], dtype=jnp.float32)
 
         jax_output = jax_timestep_embedding(t=t_vec_jax, dim=256)
         torch_output = torch_timesetp_embedding(t=t_vec_torch, dim=256)
-        print(jax_output.shape)
-        np.testing.assert_allclose(
-            np.array(jax_output), torch_output.numpy(), atol=1e-4, rtol=1e-4
+
+        chex.assert_trees_all_close(
+            jax_output,
+            torch2jax(torch_output),
+            rtol=1e-4,
+            atol=1e-4,
         )
 
     def test_mlp_embedder(self):
@@ -181,20 +183,26 @@ class LayersTestCase(np.testing.TestCase):
         )
 
         # Generate random inputs
-        np_input = np.random.randn(1, in_dim).astype(np.float32)
-        jax_input = jnp.array(np_input, dtype=jnp.float32)
-        torch_input = torch.from_numpy(np_input).to(torch.float32)
+        jax_input = jax.random.normal(
+            key=jax.random.PRNGKey(42), shape=(1, in_dim), dtype=jnp.float32
+        )
+        torch_input = torch.from_numpy(jax_input.__array__()).to(torch.float32)
 
-        np.testing.assert_allclose(np.array(jax_input), torch_input.numpy())
+        chex.assert_trees_all_close(
+            jax_input,
+            torch2jax(torch_input),
+            rtol=1e-5,
+            atol=1e-5,
+        )
 
         # Forward pass
         torch_output = torch_mlp_embedder(torch_input)
         jax_output = jax_mlp_embedder(jax_input)
 
         # Assertions
-        np.testing.assert_allclose(
-            np.array(jax_output),
-            torch_output.detach().numpy(),
+        chex.assert_trees_all_close(
+            jax_output,
+            torch2jax(torch_output),
             rtol=1e-5,
             atol=1e-5,
         )
@@ -214,20 +222,26 @@ class LayersTestCase(np.testing.TestCase):
         )
 
         # Generate random inputs
-        np_input = np.random.randn(2, dim).astype(np.float32)
-        jax_input = jnp.array(np_input, dtype=jnp.float32)
-        torch_input = torch.from_numpy(np_input).to(torch.float32)
+        jax_input = jax.random.normal(
+            key=jax.random.PRNGKey(42), shape=(2, dim), dtype=jnp.float32
+        )
+        torch_input = torch.from_numpy(jax_input.__array__()).to(torch.float32)
 
-        np.testing.assert_allclose(np.array(jax_input), torch_input.numpy())
+        chex.assert_trees_all_close(
+            jax_input,
+            torch2jax(torch_input),
+            rtol=1e-5,
+            atol=1e-5,
+        )
 
         # Forward pass
         torch_output = torch_rms_norm(torch_input)
         jax_output = jax_rms_norm(jax_input)
 
         # Assertions
-        np.testing.assert_allclose(
-            np.array(jax_output),
-            torch_output.detach().numpy(),
+        chex.assert_trees_all_close(
+            jax_output,
+            torch2jax(torch_output),
             rtol=1e-5,
             atol=1e-5,
         )
@@ -246,37 +260,49 @@ class LayersTestCase(np.testing.TestCase):
         jax_qknorm = port_qknorm(jax_qknorm=jax_qknorm, torch_qknorm=torch_qknorm)
 
         # Generate random inputs
-        np_q = np.random.randn(2, seq_len, dim).astype(np.float32)
-        np_k = np.random.randn(2, seq_len, dim).astype(np.float32)
-        np_v = np.random.randn(2, seq_len, dim).astype(np.float32)
+        jax_q = jax.random.normal(
+            key=jax.random.PRNGKey(42), shape=(2, seq_len, dim), dtype=jnp.float32
+        )
+        jax_k = jax.random.normal(
+            key=jax.random.PRNGKey(42), shape=(2, seq_len, dim), dtype=jnp.float32
+        )
+        jax_v = jax.random.normal(
+            key=jax.random.PRNGKey(42), shape=(2, seq_len, dim), dtype=jnp.float32
+        )
 
-        jax_q = jnp.array(np_q, dtype=jnp.float32)
-        torch_q = torch.from_numpy(np_q).to(torch.float32)
+        torch_q = torch.from_numpy(jax_q.__array__()).to(torch.float32)
+        torch_k = torch.from_numpy(jax_k.__array__()).to(torch.float32)
+        torch_v = torch.from_numpy(jax_v.__array__()).to(torch.float32)
 
-        jax_k = jnp.array(np_k, dtype=jnp.float32)
-        torch_k = torch.from_numpy(np_k).to(torch.float32)
-
-        jax_v = jnp.array(np_v, dtype=jnp.float32)
-        torch_v = torch.from_numpy(np_v).to(torch.float32)
-
-        np.testing.assert_allclose(np.array(jax_q), torch_q.numpy())
-        np.testing.assert_allclose(np.array(jax_k), torch_k.numpy())
+        chex.assert_trees_all_close(
+            jax_q,
+            torch2jax(torch_q),
+            rtol=1e-5,
+            atol=1e-5,
+        )
+        chex.assert_trees_all_close(
+            jax_k,
+            torch2jax(torch_k),
+            rtol=1e-5,
+            atol=1e-5,
+        )
+        chex.assert_trees_all_close(
+            jax_v,
+            torch2jax(torch_v),
+            rtol=1e-5,
+            atol=1e-5,
+        )
 
         jax_output = jax_qknorm(q=jax_q, k=jax_k, v=jax_v)
         torch_output = torch_qknorm(q=torch_q, k=torch_k, v=torch_v)
 
-        np.testing.assert_allclose(
-            np.array(jax_output[0]),
-            torch_output[0].detach().numpy(),
-            rtol=1e-5,
-            atol=1e-5,
-        )
-        np.testing.assert_allclose(
-            np.array(jax_output[1]),
-            torch_output[1].detach().numpy(),
-            rtol=1e-5,
-            atol=1e-5,
-        )
+        for i in range(len(jax_output)):
+            chex.assert_trees_all_close(
+                jax_output[i],
+                torch2jax(torch_output[i]),
+                rtol=1e-5,
+                atol=1e-5,
+            )
 
     def test_modulation(self):
         # Initialize the layer
@@ -295,32 +321,38 @@ class LayersTestCase(np.testing.TestCase):
         )
 
         # Generate random inputs
-        np_input = np.random.randn(2, dim).astype(np.float32)
-        jax_input = jnp.array(np_input, dtype=jnp.float32)
-        torch_input = torch.from_numpy(np_input).to(torch.float32)
+        jax_input = jax.random.normal(
+            key=jax.random.PRNGKey(42), shape=(2, dim), dtype=jnp.float32
+        )
+        torch_input = torch.from_numpy(jax_input.__array__()).to(torch.float32)
 
-        np.testing.assert_allclose(np.array(jax_input), torch_input.numpy())
+        chex.assert_trees_all_close(
+            jax_input,
+            torch2jax(torch_input),
+            rtol=1e-5,
+            atol=1e-5,
+        )
 
         torch_output = torch_modulation(torch_input)
         jax_output = jax_modulation(jax_input)
 
         # Assertions
-        for i in range(2):
-            np.testing.assert_allclose(
-                np.array(jax_output[i].shift),
-                torch_output[i].shift.detach().numpy(),
+        for i in range(len(jax_output)):
+            chex.assert_trees_all_close(
+                jax_output[i].shift,
+                torch2jax(torch_output[i].shift),
                 rtol=1e-5,
                 atol=1e-5,
             )
-            np.testing.assert_allclose(
-                np.array(jax_output[i].scale),
-                torch_output[i].scale.detach().numpy(),
+            chex.assert_trees_all_close(
+                jax_output[i].scale,
+                torch2jax(torch_output[i].scale),
                 rtol=1e-5,
                 atol=1e-5,
             )
-            np.testing.assert_allclose(
-                np.array(jax_output[i].gate),
-                torch_output[i].gate.detach().numpy(),
+            chex.assert_trees_all_close(
+                jax_output[i].gate,
+                torch2jax(torch_output[i].gate),
                 rtol=1e-5,
                 atol=1e-5,
             )
@@ -356,20 +388,23 @@ class LayersTestCase(np.testing.TestCase):
         )
 
         # Create the dummy inputs
-        np_img = np.random.randn(1, 4080, hidden_size).astype(np.float32)
-        np_txt = np.random.randn(1, 256, hidden_size).astype(np.float32)
-        np_vec = np.random.randn(1, hidden_size).astype(np.float32)
-        np_pe = np.random.randn(1, 1, 4336, 64, 2, 2).astype(np.float32)
+        jax_img = jax.random.normal(
+            key=jax.random.PRNGKey(42), shape=(1, 4080, hidden_size), dtype=jnp.float32
+        )
+        jax_txt = jax.random.normal(
+            key=jax.random.PRNGKey(42), shape=(1, 256, hidden_size), dtype=jnp.float32
+        )
+        jax_vec = jax.random.normal(
+            key=jax.random.PRNGKey(42), shape=(1, hidden_size), dtype=jnp.float32
+        )
+        jax_pe = jax.random.normal(
+            key=jax.random.PRNGKey(42), shape=(1, 1, 4336, 64, 2, 2), dtype=jnp.float32
+        )
 
-        jax_img = jnp.array(np_img, dtype=jnp.float32)
-        jax_txt = jnp.array(np_txt, dtype=jnp.float32)
-        jax_vec = jnp.array(np_vec, dtype=jnp.float32)
-        jax_pe = jnp.array(np_pe, dtype=jnp.float32)
-
-        torch_img = torch.from_numpy(np_img).to(torch.float32)
-        torch_txt = torch.from_numpy(np_txt).to(torch.float32)
-        torch_vec = torch.from_numpy(np_vec).to(torch.float32)
-        torch_pe = torch.from_numpy(np_pe).to(torch.float32)
+        torch_img = torch.from_numpy(jax_img.__array__()).to(torch.float32)
+        torch_txt = torch.from_numpy(jax_txt.__array__()).to(torch.float32)
+        torch_vec = torch.from_numpy(jax_vec.__array__()).to(torch.float32)
+        torch_pe = torch.from_numpy(jax_pe.__array__()).to(torch.float32)
 
         # Forward pass through the DoubleStreamBlock
         torch_img_out, torch_txt_out = torch_double_stream_block(
@@ -387,7 +422,7 @@ class LayersTestCase(np.testing.TestCase):
 
     def test_embednd(self):
         # noise
-        bs, c, h, w = (1, 16, 96, 170)
+        bs, _, h, w = (1, 16, 96, 170)
 
         img_ids = jnp.zeros((h // 2, w // 2, 3))
         img_ids = img_ids.at[..., 1].set(jnp.arange(h // 2)[:, None])

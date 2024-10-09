@@ -331,7 +331,7 @@ wheels = [
 [[package]]
 name = "jflux"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "einops" },
     { name = "fire" },
@@ -355,7 +355,6 @@ requires-dist = [
     { name = "fire", specifier = ">=0.6.0" },
     { name = "flax", specifier = ">=0.9.0" },
     { name = "jax", specifier = ">=0.4.31" },
-    { name = "jflux", virtual = "." },
     { name = "mypy", specifier = ">=1.11.2" },
     { name = "pillow", specifier = ">=10.4.0" },
     { name = "ruff", specifier = ">=0.6.3" },

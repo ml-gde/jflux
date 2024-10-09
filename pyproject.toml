@@ -9,7 +9,6 @@ dependencies = [
     "einops>=0.8.0",
     "fire>=0.6.0",
     "flax>=0.9.0",
-    "jflux",
     # FIXME: Allow for local installation without GPUs as well `jax[cuda12]`
     "jax>=0.4.31",
     "mypy>=1.11.2",
@@ -22,6 +21,7 @@ dependencies = [
 jflux = "jflux.cli:app"
 
 [tool.uv]
+package = true
 dev-dependencies = [
     "flux",
     "pytest>=8.3.3",
@@ -32,7 +32,10 @@ jflux = { workspace = true }
 flux = { git = "https://github.com/black-forest-labs/flux.git" }
 
 [tool.ruff.lint]
-select = ["I001"]
+select = ["E", "F", "I001", "W"]
+
+[tool.ruff.lint.isort]
+lines-after-imports = 2
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

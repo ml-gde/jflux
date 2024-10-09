@@ -6,10 +6,9 @@ from glob import iglob
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 from einops import rearrange
 from fire import Fire
-from flax import nnx
-from jax.typing import DTypeLike
 from PIL import Image
 
 from jflux.sampling import denoise, get_noise, get_schedule, prepare, unpack
@@ -124,7 +123,8 @@ def main(
             by the index of the sample
         prompt: Prompt used for sampling
         device: Pytorch device
-        num_steps: number of sampling steps (default 4 for schnell, 50 for guidance distilled)
+        num_steps: number of sampling steps
+            (default 4 for schnell, 50 for guidance distilled)
         loop: start an interactive session and sample multiple times
         guidance: guidance value used for guidance distillation
         add_sampling_metadata: Add the prompt to the image Exif metadata
@@ -216,7 +216,12 @@ def main(
         x = x.clip(-1, 1)
         x = rearrange(x[0], "c h w -> h w c")
 
-        img = Image.fromarray((127.5 * (x + 1.0)))
+        x = 127.5 * (x + 1.0)
+        x_numpy = np.array(x.astype(jnp.uint8))
+        img = Image.fromarray(x_numpy)
+
+        img.save(fn, quality=95, subsampling=0)
+        idx += 1
 
         if loop:
             print("-" * 80)

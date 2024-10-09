@@ -1,4 +1,4 @@
-import numpy as np
+import chex
 import pytest
 from flax import nnx
 from jax import numpy as jnp
@@ -6,7 +6,7 @@ from jax import numpy as jnp
 from jflux.model import Flux, FluxParams
 
 
-class ModelTestCase(np.testing.TestCase):
+class ModelTestCase(chex.TestCase):
     @pytest.mark.skip
     def test_model(self):
         # Initialize

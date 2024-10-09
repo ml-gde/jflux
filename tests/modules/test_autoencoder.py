@@ -1,5 +1,6 @@
+import chex
+import jax
 import jax.numpy as jnp
-import numpy as np
 import torch
 from einops import rearrange
 from flax import nnx
@@ -291,7 +292,7 @@ def port_autoencoder(
     return jax_autoencoder
 
 
-class AutoEncodersTestCase(np.testing.TestCase):
+class AutoEncodersTestCase(chex.TestCase):
     def test_attn_block(self):
         # Initialize layers
         in_channels = 32
@@ -309,20 +310,23 @@ class AutoEncodersTestCase(np.testing.TestCase):
         )
 
         # Generate random inputs
-        np_input = np.random.randn(2, 32, 4, 4).astype(np.float32)
-        jax_input = jnp.array(np_input, dtype=jnp.float32)
-        torch_input = torch.from_numpy(np_input).to(torch.float32)
+        jax_input = jax.random.normal(
+            key=jax.random.PRNGKey(42), shape=(2, 32, 4, 4), dtype=jnp.float32
+        )
+        torch_input = torch.from_numpy(jax_input.__array__()).to(torch.float32)
 
-        np.testing.assert_allclose(np.array(jax_input), torch_input.numpy())
+        chex.assert_trees_all_close(
+            jax_input, torch2jax(torch_input), rtol=1e-5, atol=1e-5
+        )
 
         # Forward pass
         torch_output = torch_attn_block(torch_input)
         jax_output = jax_attn_block(rearrange(jax_input, "b c h w -> b h w c"))
 
         # Assertions
-        np.testing.assert_allclose(
-            np.array(rearrange(jax_output, "b h w c -> b c h w")),
-            torch_output.detach().numpy(),
+        chex.assert_trees_all_close(
+            rearrange(jax_output, "b h w c -> b c h w"),
+            torch2jax(torch_output),
             rtol=1e-5,
             atol=1e-5,
         )
@@ -350,20 +354,23 @@ class AutoEncodersTestCase(np.testing.TestCase):
         )
 
         # Generate random inputs
-        np_input = np.random.randn(2, 32, 4, 4).astype(np.float32)
-        jax_input = jnp.array(np_input, dtype=jnp.float32)
-        torch_input = torch.from_numpy(np_input).to(torch.float32)
+        jax_input = jax.random.normal(
+            key=jax.random.PRNGKey(42), shape=(2, 32, 4, 4), dtype=jnp.float32
+        )
+        torch_input = torch.from_numpy(jax_input.__array__()).to(torch.float32)
 
-        np.testing.assert_allclose(np.array(jax_input), torch_input.numpy())
+        chex.assert_trees_all_close(
+            jax_input, torch2jax(torch_input), rtol=1e-5, atol=1e-5
+        )
 
         # Forward pass
         torch_output = torch_resnet_block(torch_input)
         jax_output = jax_resnet_block(rearrange(jax_input, "b c h w -> b h w c"))
 
         # Assertions
-        np.testing.assert_allclose(
-            np.array(rearrange(jax_output, "b h w c -> b c h w")),
-            torch_output.detach().numpy(),
+        chex.assert_trees_all_close(
+            rearrange(jax_output, "b h w c -> b c h w"),
+            torch2jax(torch_output),
             rtol=1e-5,
             atol=1e-5,
         )
@@ -387,20 +394,23 @@ class AutoEncodersTestCase(np.testing.TestCase):
         )
 
         # Generate random inputs
-        np_input = np.random.randn(2, 32, 4, 4).astype(np.float32)
-        jax_input = jnp.array(np_input, dtype=jnp.float32)
-        torch_input = torch.from_numpy(np_input).to(torch.float32)
+        jax_input = jax.random.normal(
+            key=jax.random.PRNGKey(42), shape=(2, 32, 4, 4), dtype=jnp.float32
+        )
+        torch_input = torch.from_numpy(jax_input.__array__()).to(torch.float32)
 
-        np.testing.assert_allclose(np.array(jax_input), torch_input.numpy())
+        chex.assert_trees_all_close(
+            jax_input, torch2jax(torch_input), rtol=1e-5, atol=1e-5
+        )
 
         # Forward pass
         torch_output = torch_downsample(torch_input)
         jax_output = jax_downsample(rearrange(jax_input, "b c h w -> b h w c"))
 
         # Assertions
-        np.testing.assert_allclose(
-            np.array(rearrange(jax_output, "b h w c -> b c h w")),
-            torch_output.detach().numpy(),
+        chex.assert_trees_all_close(
+            rearrange(jax_output, "b h w c -> b c h w"),
+            torch2jax(torch_output),
             rtol=1e-5,
             atol=1e-5,
         )
@@ -424,20 +434,23 @@ class AutoEncodersTestCase(np.testing.TestCase):
         )
 
         # Generate random inputs
-        np_input = np.random.randn(2, 32, 4, 4).astype(np.float32)
-        jax_input = jnp.array(np_input, dtype=jnp.float32)
-        torch_input = torch.from_numpy(np_input).to(torch.float32)
+        jax_input = jax.random.normal(
+            key=jax.random.PRNGKey(42), shape=(2, 32, 4, 4), dtype=jnp.float32
+        )
+        torch_input = torch.from_numpy(jax_input.__array__()).to(torch.float32)
 
-        np.testing.assert_allclose(np.array(jax_input), torch_input.numpy())
+        chex.assert_trees_all_close(
+            jax_input, torch2jax(torch_input), rtol=1e-5, atol=1e-5
+        )
 
         # Forward pass
         torch_output = torch_upsample(torch_input)
         jax_output = jax_upsample(rearrange(jax_input, "b c h w -> b h w c"))
 
         # Assertions
-        np.testing.assert_allclose(
-            np.array(rearrange(jax_output, "b h w c -> b c h w")),
-            torch_output.detach().numpy(),
+        chex.assert_trees_all_close(
+            rearrange(jax_output, "b h w c -> b c h w"),
+            torch2jax(torch_output),
             rtol=1e-5,
             atol=1e-5,
         )
@@ -476,22 +489,25 @@ class AutoEncodersTestCase(np.testing.TestCase):
         jax_encoder = port_encoder(jax_encoder=jax_encoder, torch_encoder=torch_encoder)
 
         # Generate random inputs
-        np_input = np.random.randn(1, in_channels, resolution, resolution).astype(
-            np.float32
+        jax_input = jax.random.normal(
+            key=jax.random.PRNGKey(42),
+            shape=(1, in_channels, resolution, resolution),
+            dtype=jnp.float32,
         )
-        jax_input = jnp.array(np_input, dtype=jnp.float32)
-        torch_input = torch.from_numpy(np_input).to(torch.float32)
+        torch_input = torch.from_numpy(jax_input.__array__()).to(torch.float32)
 
-        np.testing.assert_allclose(np.array(jax_input), torch_input.numpy())
+        chex.assert_trees_all_close(
+            jax_input, torch2jax(torch_input), rtol=1e-5, atol=1e-5
+        )
 
         # Forward pass
         torch_output = torch_encoder(torch_input)
         jax_output = jax_encoder(rearrange(jax_input, "b c h w -> b h w c"))
 
         # Assertions
-        np.testing.assert_allclose(
-            np.array(rearrange(jax_output, "b h w c -> b c h w")),
-            torch_output.detach().numpy(),
+        chex.assert_trees_all_close(
+            rearrange(jax_output, "b h w c -> b c h w"),
+            torch2jax(torch_output),
             rtol=1e-5,
             atol=1e-5,
         )
@@ -533,22 +549,30 @@ class AutoEncodersTestCase(np.testing.TestCase):
         jax_decoder = port_decoder(jax_decoder=jax_decoder, torch_decoder=torch_decoder)
 
         # Generate random inputs
-        np_input = np.random.randn(
-            1, z_channels, resolution // len(ch_mult), resolution // len(ch_mult)
-        ).astype(np.float32)
-        jax_input = jnp.array(np_input, dtype=jnp.float32)
-        torch_input = torch.from_numpy(np_input).to(torch.float32)
+        jax_input = jax.random.normal(
+            key=jax.random.PRNGKey(42),
+            shape=(
+                1,
+                z_channels,
+                resolution // len(ch_mult),
+                resolution // len(ch_mult),
+            ),
+            dtype=jnp.float32,
+        )
+        torch_input = torch.from_numpy(jax_input.__array__()).to(torch.float32)
 
-        np.testing.assert_allclose(np.array(jax_input), torch_input.numpy())
+        chex.assert_trees_all_close(
+            jax_input, torch2jax(torch_input), rtol=1e-5, atol=1e-5
+        )
 
         # Forward pass
         torch_output = torch_decoder(torch_input)
         jax_output = jax_decoder(rearrange(jax_input, "b c h w -> b h w c"))
 
         # Assertions
-        np.testing.assert_allclose(
-            np.array(rearrange(jax_output, "b h w c -> b c h w")),
-            torch_output.detach().numpy(),
+        chex.assert_trees_all_close(
+            rearrange(jax_output, "b h w c -> b c h w"),
+            torch2jax(torch_output),
             rtol=1e-5,
             atol=1e-5,
         )
@@ -591,8 +615,8 @@ class AutoEncodersTestCase(np.testing.TestCase):
             z_channels=z_channels,
             scale_factor=scale_factor,
             shift_factor=shift_factor,
-            rngs=nnx.Rngs(default=42),
-            param_dtype=jnp.float32,
+            rngs=rngs,
+            param_dtype=param_dtype,
         )
 
         torch_autoencoder = TorchAutoEncoder(params=torch_params)
@@ -608,23 +632,26 @@ class AutoEncodersTestCase(np.testing.TestCase):
             torch_autoencoder=torch_autoencoder,
         )
 
-        # inputs
-        np_input = np.random.randn(1, in_channels, resolution, resolution).astype(
-            np.float32
+        # Generate random inputs
+        jax_input = jax.random.normal(
+            key=jax.random.PRNGKey(42),
+            shape=(1, in_channels, resolution, resolution),
+            dtype=jnp.float32,
         )
-        jax_input = jnp.array(np_input, dtype=jnp.float32)
-        torch_input = torch.from_numpy(np_input).to(torch.float32)
+        torch_input = torch.from_numpy(jax_input.__array__()).to(torch.float32)
 
-        np.testing.assert_allclose(np.array(jax_input), torch_input.numpy())
+        chex.assert_trees_all_close(
+            jax_input, torch2jax(torch_input), rtol=1e-5, atol=1e-5
+        )
 
         # forward pass
         torch_output = torch_autoencoder(torch_input)
         jax_output = jax_autoencoder(jax_input)
 
         # Assertions
-        np.testing.assert_allclose(
-            np.array(jax_output),
-            torch_output.detach().numpy(),
+        chex.assert_trees_all_close(
+            jax_output,
+            torch2jax(torch_output),
             rtol=1e-5,
             atol=1e-5,
         )
