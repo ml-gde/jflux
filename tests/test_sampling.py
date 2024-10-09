@@ -31,7 +31,7 @@ class SamplingTestCase(chex.TestCase):
             width=width,
             dtype=torch.bfloat16,
             seed=42,
-            device="cuda",
+            device="cuda" if torch.cuda.is_available() else "cpu",
         )
         print(x_jax.shape)
         chex.assert_equal_shape([x_jax, x_torch])
