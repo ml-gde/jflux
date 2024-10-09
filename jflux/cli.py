@@ -3,7 +3,7 @@ import re
 import time
 from dataclasses import dataclass
 from glob import iglob
-
+import torch
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -14,6 +14,10 @@ from PIL import Image
 from jflux.sampling import denoise, get_noise, get_schedule, prepare, unpack
 from jflux.util import configs, load_ae, load_clip, load_flow_model, load_t5
 
+def torch2jax(tensor):
+    tensor = tensor.float().numpy()
+    tensor = jnp.array(tensor, dtype=jnp.bfloat16)
+    return tensor
 
 @dataclass
 class SamplingOptions:
@@ -195,12 +199,8 @@ def main(
 
         # denoise initial noise
         x = denoise(
-            model=model,
-            img=inp["img"],
-            img_ids=inp["img_ids"],
-            txt=inp["txt"],
-            txt_ids=inp["txt_ids"],
-            vec=inp["vec"],
+            model,
+            **inp,
             timesteps=timesteps,
             guidance=opts.guidance,
         )

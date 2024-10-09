@@ -92,22 +92,6 @@ class MLPEmbedder(nnx.Module):
         return self.out_layer(self.silu(self.in_layer(x)))
 
 
-class RMSNorm(nnx.Module):
-    def __init__(
-        self,
-        dim: int,
-        rngs: nnx.Rngs,
-        param_dtype: DTypeLike = jax.dtypes.bfloat16,
-    ):
-        self.scale = nnx.Variable(jnp.ones(dim, dtype=param_dtype))
-
-    def __call__(self, x: Array):
-        x_dtype = x.dtype
-        x = x.astype(jnp.float32)
-        rrms = jnp.reciprocal(jnp.sqrt(jnp.mean(x**2, axis=-1, keepdims=True) + 1e-6))
-        return (x * rrms).astype(dtype=x_dtype) * self.scale
-
-
 class QKNorm(nnx.Module):
     def __init__(
         self,
@@ -115,8 +99,8 @@ class QKNorm(nnx.Module):
         rngs: nnx.Rngs,
         param_dtype: DTypeLike = jax.dtypes.bfloat16,
     ):
-        self.query_norm = RMSNorm(dim, rngs=rngs, param_dtype=param_dtype)
-        self.key_norm = RMSNorm(dim, rngs=rngs, param_dtype=param_dtype)
+        self.query_norm = nnx.RMSNorm(dim, rngs=rngs, param_dtype=param_dtype)
+        self.key_norm = nnx.RMSNorm(dim, rngs=rngs, param_dtype=param_dtype)
 
     def __call__(self, q: Array, k: Array, v: Array) -> tuple[Array, Array]:
         q = self.query_norm(q)
