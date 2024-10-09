@@ -482,3 +482,5 @@ def port_flux(flux, tensors):
         tensors=tensors,
         prefix="final_layer",
     )
+
+    return flux
