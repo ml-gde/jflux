@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import torch  # need for t5 and clip
 from flax import nnx
 from huggingface_hub import hf_hub_download
+import jax
 from jax import numpy as jnp
 from safetensors import safe_open
 
@@ -11,6 +12,11 @@ from jflux.model import Flux, FluxParams
 from jflux.modules.autoencoder import AutoEncoder, AutoEncoderParams
 from jflux.modules.conditioner import HFEmbedder
 from jflux.port import port_autoencoder, port_flux
+
+def torch2jax(torch_tensor):
+    intermediate_tensor = torch_tensor.to(torch.float32)
+    jax_tensor = jnp.array(intermediate_tensor, dtype=jnp.bfloat16)
+    return jax_tensor
 
 
 @dataclass
@@ -127,9 +133,10 @@ def load_flow_model(name: str, hf_download: bool = True) -> Flux:
 
     if ckpt_path is not None:
         tensors = {}
-        with safe_open(ckpt_path, framework="flax") as f:
+        with safe_open(ckpt_path, framework="pt") as f:
             for k in f.keys():
-                tensors[k] = f.get_tensor(k)
+                with jax.default_device(jax.devices("cpu")[0]):
+                    tensors[k] = torch2jax(f.get_tensor(k))
 
         model = port_flux(flux=model, tensors=tensors)
         del tensors
@@ -166,9 +173,10 @@ def load_ae(name: str, hf_download: bool = True) -> AutoEncoder:
 
     if ckpt_path is not None:
         tensors = {}
-        with safe_open(ckpt_path, framework="flax") as f:
+        with safe_open(ckpt_path, framework="pt") as f:
             for k in f.keys():
-                tensors[k] = f.get_tensor(k)
+                with jax.default_device(jax.devices("cpu")[0]):
+                    tensors[k] = torch2jax(f.get_tensor(k))
 
         ae = port_autoencoder(autoencoder=ae, tensors=tensors)
         del tensors

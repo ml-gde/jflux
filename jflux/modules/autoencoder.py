@@ -85,7 +85,7 @@ class AttnBlock(nnx.Module):
         v = rearrange(v, "b h w c-> b (h w) 1 c")
 
         # Calculate Attention
-        h_ = nnx.dot_product_attention(q, k, v)
+        h_ = jax.nn.dot_product_attention(q, k, v)
 
         return rearrange(h_, "b (h w) 1 c -> b h w c", h=h, w=w, c=c, b=b)
 
