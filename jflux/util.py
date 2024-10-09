@@ -1,8 +1,8 @@
 import os
 from dataclasses import dataclass
 
-import torch  # need for t5 and clip
 import jax
+import torch  # need for t5 and clip
 from flax import nnx
 from huggingface_hub import hf_hub_download
 from jax import numpy as jnp
@@ -12,7 +12,6 @@ from safetensors import safe_open
 from jflux.model import Flux, FluxParams
 from jflux.modules.autoencoder import AutoEncoder, AutoEncoderParams
 from jflux.modules.conditioner import HFEmbedder
-
 from jflux.port import port_autoencoder, port_flux
 
 

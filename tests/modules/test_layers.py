@@ -1,27 +1,26 @@
+import jax
 import jax.numpy as jnp
 import numpy as np
-import jax
 import torch
 from einops import rearrange, repeat
 from flax import nnx
 from flux.modules.layers import DoubleStreamBlock as TorchDoubleStreamBlock
+from flux.modules.layers import EmbedND as TorchEmbedND
 from flux.modules.layers import MLPEmbedder as TorchMLPEmbedder
 from flux.modules.layers import Modulation as TorchModulation
 from flux.modules.layers import QKNorm as TorchQKNorm
 from flux.modules.layers import RMSNorm as TorchRMSNorm
 from flux.modules.layers import SelfAttention as TorchSelfAttention
 from flux.modules.layers import timestep_embedding as torch_timesetp_embedding
-from flux.modules.layers import EmbedND as TorchEmbedND
 
 from jflux.modules.layers import DoubleStreamBlock as JaxDoubleStreamBlock
+from jflux.modules.layers import EmbedND as JaxEmbedND
 from jflux.modules.layers import MLPEmbedder as JaxMLPEmbedder
 from jflux.modules.layers import Modulation as JaxModulation
 from jflux.modules.layers import QKNorm as JaxQKNorm
 from jflux.modules.layers import RMSNorm as JaxRMSNorm
 from jflux.modules.layers import SelfAttention as JaxSelfAttention
 from jflux.modules.layers import timestep_embedding as jax_timestep_embedding
-from jflux.modules.layers import EmbedND as JaxEmbedND
-
 from tests.utils import torch2jax
 
 

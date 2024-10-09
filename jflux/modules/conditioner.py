@@ -1,7 +1,7 @@
 # Note: This is a torch module not a Jax module
-from torch import nn
-from chex import Array
 import jax.numpy as jnp
+from chex import Array
+from torch import nn
 from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 
 

@@ -1,10 +1,10 @@
-import numpy as np
-import jax
-import torch
 import chex
-from jflux.sampling import get_noise as jax_get_noise
-
+import jax
+import numpy as np
+import torch
 from flux.sampling import get_noise as torch_get_noise
+
+from jflux.sampling import get_noise as jax_get_noise
 
 
 class SamplingTestCase(chex.TestCase):
