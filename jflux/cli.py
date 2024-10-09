@@ -6,6 +6,7 @@ from glob import iglob
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 from einops import rearrange
 from fire import Fire
 from PIL import Image
@@ -215,8 +216,12 @@ def main(
         x = x.clip(-1, 1)
         x = rearrange(x[0], "c h w -> h w c")
 
-        img = Image.fromarray((127.5 * (x + 1.0)))
+        x = 127.5 * (x + 1.0)
+        x_numpy = np.array(x.astype(jnp.uint8))
+        img = Image.fromarray(x_numpy)
+
         img.save(fn, quality=95, subsampling=0)
+        idx += 1
 
         if loop:
             print("-" * 80)
