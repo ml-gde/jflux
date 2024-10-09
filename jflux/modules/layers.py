@@ -214,6 +214,7 @@ class DoubleStreamBlock(nnx.Module):
         self.img_norm1 = nnx.LayerNorm(
             num_features=hidden_size,
             use_scale=False,
+            use_bias=False,
             epsilon=1e-6,
             rngs=rngs,
             param_dtype=param_dtype,
@@ -229,6 +230,7 @@ class DoubleStreamBlock(nnx.Module):
         self.img_norm2 = nnx.LayerNorm(
             num_features=hidden_size,
             use_scale=False,
+            use_bias=False,
             epsilon=1e-6,
             rngs=rngs,
             param_dtype=param_dtype,
@@ -257,6 +259,7 @@ class DoubleStreamBlock(nnx.Module):
         self.txt_norm1 = nnx.LayerNorm(
             num_features=hidden_size,
             use_scale=False,
+            use_bias=False,
             epsilon=1e-6,
             rngs=rngs,
             param_dtype=param_dtype,
@@ -272,6 +275,7 @@ class DoubleStreamBlock(nnx.Module):
         self.txt_norm2 = nnx.LayerNorm(
             num_features=hidden_size,
             use_scale=False,
+            use_bias=False,
             epsilon=1e-6,
             rngs=rngs,
             param_dtype=param_dtype,
@@ -382,6 +386,7 @@ class SingleStreamBlock(nnx.Module):
         self.pre_norm = nnx.LayerNorm(
             num_features=hidden_size,
             use_scale=False,
+            use_bias=False,
             epsilon=1e-6,
             rngs=rngs,
             param_dtype=param_dtype,
@@ -419,6 +424,7 @@ class LastLayer(nnx.Module):
         self.norm_final = nnx.LayerNorm(
             num_features=hidden_size,
             use_scale=False,
+            use_bias=False,
             epsilon=1e-6,
             rngs=rngs,
             param_dtype=param_dtype,

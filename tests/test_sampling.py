@@ -1,10 +1,10 @@
-import numpy as np
-import jax
-import torch
 import chex
-from jflux.sampling import get_noise as jax_get_noise
-
+import jax
+import numpy as np
+import torch
 from flux.sampling import get_noise as torch_get_noise
+
+from jflux.sampling import get_noise as jax_get_noise
 
 
 class SamplingTestCase(chex.TestCase):
@@ -22,16 +22,15 @@ class SamplingTestCase(chex.TestCase):
             num_samples=1,
             height=height,
             width=width,
-            dtype=jax.dtypes.bfloat16,
+            dtype=jax.numpy.float32,
             seed=jax.random.PRNGKey(seed=42),
         )
         x_torch = torch_get_noise(
             num_samples=1,
             height=height,
             width=width,
-            dtype=torch.bfloat16,
+            dtype=torch.float32,
             seed=42,
-            device="cuda",
+            device="cuda" if torch.cuda.is_available() else "cpu",
         )
-        print(x_jax.shape)
         chex.assert_equal_shape([x_jax, x_torch])

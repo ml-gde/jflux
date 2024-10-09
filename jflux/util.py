@@ -1,8 +1,8 @@
 import os
 from dataclasses import dataclass
 
-import torch  # need for t5 and clip
 import jax
+import torch  # need for t5 and clip
 from flax import nnx
 from huggingface_hub import hf_hub_download
 from jax import numpy as jnp
@@ -12,8 +12,7 @@ from safetensors import safe_open
 from jflux.model import Flux, FluxParams
 from jflux.modules.autoencoder import AutoEncoder, AutoEncoderParams
 from jflux.modules.conditioner import HFEmbedder
-
-from port import port_autoencoder
+from jflux.port import port_autoencoder, port_flux
 
 
 @dataclass
@@ -128,13 +127,14 @@ def load_flow_model(name: str, hf_download: bool = True) -> Flux:
 
     model = Flux(params=configs[name].params)
 
-    # TODO (ariG23498): Port the flux model
     if ckpt_path is not None:
-        print("Loading checkpoint")
-        # load_sft doesn't support torch.device
-        sd = load_sft(ckpt_path)
-        missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
-        print_load_warning(missing, unexpected)
+        tensors = {}
+        with safe_open(ckpt_path, framework="flax") as f:
+            for k in f.keys():
+                tensors[k] = f.get_tensor(k)
+
+        model = port_flux(flux=model, tensors=tensors)
+        del tensors
     return model
 
 
@@ -166,7 +166,6 @@ def load_ae(name: str, hf_download: bool = True) -> AutoEncoder:
     print("Init AE")
     ae = AutoEncoder(params=configs[name].ae_params)
 
-    # TODO (ariG23498): Port the flux model
     if ckpt_path is not None:
         tensors = {}
         with safe_open(ckpt_path, framework="flax") as f:
@@ -174,4 +173,5 @@ def load_ae(name: str, hf_download: bool = True) -> AutoEncoder:
                 tensors[k] = f.get_tensor(k)
 
         ae = port_autoencoder(autoencoder=ae, tensors=tensors)
+        del tensors
     return ae
