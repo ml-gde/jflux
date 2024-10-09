@@ -22,14 +22,14 @@ class SamplingTestCase(chex.TestCase):
             num_samples=1,
             height=height,
             width=width,
-            dtype=jax.dtypes.bfloat16,
+            dtype=jax.numpy.float32,
             seed=jax.random.PRNGKey(seed=42),
         )
         x_torch = torch_get_noise(
             num_samples=1,
             height=height,
             width=width,
-            dtype=torch.bfloat16,
+            dtype=torch.float32,
             seed=42,
             device="cuda" if torch.cuda.is_available() else "cpu",
         )
