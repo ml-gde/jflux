@@ -9,7 +9,6 @@ dependencies = [
     "einops>=0.8.0",
     "fire>=0.6.0",
     "flax>=0.9.0",
-    "jflux",
     # FIXME: Allow for local installation without GPUs as well `jax[cuda12]`
     "jax>=0.4.31",
     "mypy>=1.11.2",
