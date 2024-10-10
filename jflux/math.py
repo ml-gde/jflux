@@ -1,19 +1,18 @@
+import jax
 from chex import Array
 from einops import rearrange
-from flax import nnx
-import jax
 from jax import numpy as jnp
 
 
 def attention(q: Array, k: Array, v: Array, pe: Array) -> Array:
     q, k = apply_rope(q, k, pe)
 
-    q = rearrange(q, "B H L D -> B L H D") # for jax
-    k = rearrange(k, "B H L D -> B L H D") # for jax
-    v = rearrange(v, "B H L D -> B L H D") # for jax
-    
+    q = rearrange(q, "B H L D -> B L H D")  # for jax
+    k = rearrange(k, "B H L D -> B L H D")  # for jax
+    v = rearrange(v, "B H L D -> B L H D")  # for jax
+
     x = jax.nn.dot_product_attention(q, k, v)
-    
+
     x = rearrange(x, "B L H D -> B L (H D)")
 
     return x

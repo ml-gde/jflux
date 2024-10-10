@@ -1,10 +1,10 @@
 import os
 from dataclasses import dataclass
 
+import jax
 import torch  # need for t5 and clip
 from flax import nnx
 from huggingface_hub import hf_hub_download
-import jax
 from jax import numpy as jnp
 from safetensors import safe_open
 
@@ -12,6 +12,7 @@ from jflux.model import Flux, FluxParams
 from jflux.modules.autoencoder import AutoEncoder, AutoEncoderParams
 from jflux.modules.conditioner import HFEmbedder
 from jflux.port import port_autoencoder, port_flux
+
 
 def torch2jax(torch_tensor):
     intermediate_tensor = torch_tensor.to(torch.float32)
@@ -117,7 +118,7 @@ def print_load_warning(missing: list[str], unexpected: list[str]) -> None:
         print(f"Got {len(unexpected)} unexpected keys:\n\t" + "\n\t".join(unexpected))
 
 
-def load_flow_model(name: str, hf_download: bool = True) -> Flux:
+def load_flow_model(name: str, offload: str, hf_download: bool = True) -> Flux:
     # Loading Flux
     print("Init model")
     ckpt_path = configs[name].ckpt_path
@@ -131,11 +132,16 @@ def load_flow_model(name: str, hf_download: bool = True) -> Flux:
 
     model = Flux(params=configs[name].params)
 
+    if offload:
+        jax_device = jax.devices("cpu")[0]
+    else:
+        jax_device = jax.devices()[0]
+
     if ckpt_path is not None:
         tensors = {}
         with safe_open(ckpt_path, framework="pt") as f:
             for k in f.keys():
-                with jax.default_device(jax.devices("cpu")[0]):
+                with jax.default_device(jax_device):
                     tensors[k] = torch2jax(f.get_tensor(k))
 
         model = port_flux(flux=model, tensors=tensors)
@@ -143,21 +149,23 @@ def load_flow_model(name: str, hf_download: bool = True) -> Flux:
     return model
 
 
-def load_t5() -> HFEmbedder:
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+def load_t5(device: str = "cuda") -> HFEmbedder:
+    if device == "cuda":
+        assert torch.cuda.is_available(), "No CUDA device available"
     return HFEmbedder(
         "google/t5-v1_1-xxl", max_length=512, torch_dtype=torch.bfloat16
     ).to(device)
 
 
-def load_clip() -> HFEmbedder:
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+def load_clip(device: str = "cuda") -> HFEmbedder:
+    if device == "cuda":
+        assert torch.cuda.is_available(), "No CUDA device available"
     return HFEmbedder(
         "openai/clip-vit-large-patch14", max_length=77, torch_dtype=torch.bfloat16
     ).to(device)
 
 
-def load_ae(name: str, hf_download: bool = True) -> AutoEncoder:
+def load_ae(name: str, offload: bool, hf_download: bool = True) -> AutoEncoder:
     ckpt_path = configs[name].ae_path
     if (
         ckpt_path is None
@@ -171,11 +179,16 @@ def load_ae(name: str, hf_download: bool = True) -> AutoEncoder:
     print("Init AE")
     ae = AutoEncoder(params=configs[name].ae_params)
 
+    if offload:
+        jax_device = jax.devices("cpu")[0]
+    else:
+        jax_device = jax.devices()[0]
+
     if ckpt_path is not None:
         tensors = {}
         with safe_open(ckpt_path, framework="pt") as f:
             for k in f.keys():
-                with jax.default_device(jax.devices("cpu")[0]):
+                with jax.default_device(jax_device):
                     tensors[k] = torch2jax(f.get_tensor(k))
 
         ae = port_autoencoder(autoencoder=ae, tensors=tensors)

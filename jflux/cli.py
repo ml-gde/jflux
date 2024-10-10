@@ -3,10 +3,11 @@ import re
 import time
 from dataclasses import dataclass
 from glob import iglob
-import torch
+
 import jax
 import jax.numpy as jnp
 import numpy as np
+import torch
 from einops import rearrange
 from fire import Fire
 from PIL import Image
@@ -14,10 +15,12 @@ from PIL import Image
 from jflux.sampling import denoise, get_noise, get_schedule, prepare, unpack
 from jflux.util import configs, load_ae, load_clip, load_flow_model, load_t5
 
+
 def torch2jax(tensor):
     tensor = tensor.float().numpy()
     tensor = jnp.array(tensor, dtype=jnp.bfloat16)
     return tensor
+
 
 @dataclass
 class SamplingOptions:
@@ -162,8 +165,8 @@ def main(
     # init all components
     t5 = load_t5()
     clip = load_clip()
-    model = load_flow_model(name)
-    ae = load_ae(name)
+    model = load_flow_model(name, offload)
+    ae = load_ae(name, offload)
 
     opts = SamplingOptions(
         prompt=prompt,
@@ -190,12 +193,25 @@ def main(
         )
         opts.seed = None
 
+        if offload:
+            # move ae to cpu
+            jax.clear_caches()
+            t5, clip = (
+                t5.to("cuda" if torch.cuda.is_available() else "cpu"),
+                clip.to("cuda" if torch.cuda.is_available() else "cpu"),
+            )
+
         inp = prepare(t5=t5, clip=clip, img=x, prompt=opts.prompt)
         timesteps = get_schedule(
             num_steps=opts.num_steps,
             image_seq_len=inp["img"].shape[1],
             shift=(name != "flux-schnell"),
         )
+
+        if offload:
+            t5, clip = t5.cpu(), clip.cpu()
+            jax.clear_caches()
+            # keep the model on gpu
 
         # denoise initial noise
         x = denoise(
@@ -204,6 +220,10 @@ def main(
             timesteps=timesteps,
             guidance=opts.guidance,
         )
+        if offload:
+            # move model to cpu
+            jax.clear_caches()
+            # move ae decoder to gpu(x.device?)
 
         # decode latents to pixel space
         x = unpack(x=x.astype(jnp.float32), height=opts.height, width=opts.width)
