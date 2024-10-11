@@ -2,7 +2,7 @@ import os
 from dataclasses import dataclass
 
 import jax
-import torch  # need for t5 and clip
+import torch  # need for torch 2 jax
 from flax import nnx
 from huggingface_hub import hf_hub_download
 from jax import numpy as jnp
@@ -153,16 +153,18 @@ def load_t5(device: str = "cuda") -> HFEmbedder:
     if device == "cuda":
         assert torch.cuda.is_available(), "No CUDA device available"
     return HFEmbedder(
-        "google/t5-v1_1-xxl", max_length=512, torch_dtype=torch.bfloat16
-    ).to(device)
+        "ariG23498/t5-v1-1-xxl-flax",
+        max_length=512,
+    )
 
 
 def load_clip(device: str = "cuda") -> HFEmbedder:
     if device == "cuda":
         assert torch.cuda.is_available(), "No CUDA device available"
     return HFEmbedder(
-        "openai/clip-vit-large-patch14", max_length=77, torch_dtype=torch.bfloat16
-    ).to(device)
+        "ariG23498/clip-vit-large-patch14-text-flax",
+        max_length=77,
+    )
 
 
 def load_ae(name: str, offload: bool, hf_download: bool = True) -> AutoEncoder:
