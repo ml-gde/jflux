@@ -7,7 +7,6 @@ from glob import iglob
 import jax
 import jax.numpy as jnp
 import numpy as np
-import torch
 from einops import rearrange
 from fire import Fire
 from flax import nnx
@@ -166,8 +165,6 @@ def main(
     # init all components
     t5 = load_t5()
     clip = load_clip()
-    model = load_flow_model(name, offload)
-    ae = load_ae(name, offload)
 
     opts = SamplingOptions(
         prompt=prompt,
@@ -194,20 +191,6 @@ def main(
         )
         opts.seed = None
 
-        if offload:
-            # move ae to cpu
-            cpu_device = jax.devices("cpu")[0]
-            state = nnx.state(model)
-            state = jax.device_put(state, cpu_device)
-            nnx.update(model, state)
-            # clear jax cache
-            jax.clear_caches()
-            # move t5 and clip to gpu
-            t5, clip = (
-                t5.to("cuda" if torch.cuda.is_available() else "cpu"),
-                clip.to("cuda" if torch.cuda.is_available() else "cpu"),
-            )
-
         inp = prepare(t5=t5, clip=clip, img=x, prompt=opts.prompt)
         timesteps = get_schedule(
             num_steps=opts.num_steps,
@@ -217,13 +200,22 @@ def main(
 
         if offload:
             # move t5 and clip to cpu
-            t5, clip = t5.cpu(), clip.cpu()
+            cpu_device = jax.devices("cpu")[0]
+            clip_state = nnx.state(clip)
+            clip_state = jax.device_put(clip_state, cpu_device)
+            nnx.update(clip, clip_state)
+
+            t5_state = nnx.state(t5)
+            t5_state = jax.device_put(t5_state, cpu_device)
+            nnx.update(t5, t5_state)
             # clear jax cache
             jax.clear_caches()
-            # move model to gpu
-            state = nnx.state(model)
-            state = jax.device_put(state, jax.devices("gpu")[0])
-            nnx.update(model, state)
+            del clip, t5, clip_state, t5_state
+
+        model = load_flow_model(name, offload)
+        state = nnx.state(model)
+        state = jax.device_put(state, jax.devices("gpu")[0])
+        nnx.update(model, state)
 
         # denoise initial noise
         x = denoise(
@@ -239,10 +231,14 @@ def main(
             nnx.update(model, state)
             # clear jax cache
             jax.clear_caches()
-            # move ae decoder to gpu(x.device?)
-            decoder_state = nnx.state(ae.decoder)
-            decoder_state = jax.device_put(decoder_state, x.device)
-            nnx.update(ae.decoder, decoder_state)
+            del model, state
+
+        ae = load_ae(name, offload)
+
+        # move ae decoder to gpu(x.device?)
+        decoder_state = nnx.state(ae.decoder)
+        decoder_state = jax.device_put(decoder_state, x.device)
+        nnx.update(ae.decoder, decoder_state)
 
         # decode latents to pixel space
         x = unpack(x=x.astype(jnp.float32), height=opts.height, width=opts.width)
