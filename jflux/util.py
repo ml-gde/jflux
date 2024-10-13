@@ -149,18 +149,14 @@ def load_flow_model(name: str, offload: str, hf_download: bool = True) -> Flux:
     return model
 
 
-def load_t5(device: str = "cuda") -> HFEmbedder:
-    if device == "cuda":
-        assert torch.cuda.is_available(), "No CUDA device available"
+def load_t5() -> HFEmbedder:
     return HFEmbedder(
         "ariG23498/t5-v1-1-xxl-flax",
         max_length=512,
     )
 
 
-def load_clip(device: str = "cuda") -> HFEmbedder:
-    if device == "cuda":
-        assert torch.cuda.is_available(), "No CUDA device available"
+def load_clip() -> HFEmbedder:
     return HFEmbedder(
         "ariG23498/clip-vit-large-patch14-text-flax",
         max_length=77,
