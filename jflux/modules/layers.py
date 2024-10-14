@@ -70,7 +70,7 @@ class MLPEmbedder(nnx.Module):
         in_dim: int,
         hidden_dim: int,
         rngs: nnx.Rngs,
-        param_dtype: DTypeLike = jax.dtypes.bfloat16,
+        param_dtype: DTypeLike = jnp.bfloat16,
     ):
         self.in_layer = nnx.Linear(
             in_features=in_dim,
@@ -97,7 +97,7 @@ class QKNorm(nnx.Module):
         self,
         dim: int,
         rngs: nnx.Rngs,
-        param_dtype: DTypeLike = jax.dtypes.bfloat16,
+        param_dtype: DTypeLike = jnp.bfloat16,
     ):
         self.query_norm = nnx.RMSNorm(dim, rngs=rngs, param_dtype=param_dtype)
         self.key_norm = nnx.RMSNorm(dim, rngs=rngs, param_dtype=param_dtype)
@@ -113,7 +113,7 @@ class SelfAttention(nnx.Module):
         self,
         dim: int,
         rngs: nnx.Rngs,
-        param_dtype: DTypeLike = jax.dtypes.bfloat16,
+        param_dtype: DTypeLike = jnp.bfloat16,
         num_heads: int = 8,
         qkv_bias: bool = False,
     ):
@@ -158,7 +158,7 @@ class Modulation(nnx.Module):
         dim: int,
         double: bool,
         rngs: nnx.Rngs,
-        param_dtype: DTypeLike = jax.dtypes.bfloat16,
+        param_dtype: DTypeLike = jnp.bfloat16,
     ):
         self.is_double = double
         self.multiplier = 6 if double else 3
@@ -186,7 +186,7 @@ class DoubleStreamBlock(nnx.Module):
         num_heads: int,
         mlp_ratio: float,
         rngs: nnx.Rngs,
-        param_dtype: DTypeLike = jax.dtypes.bfloat16,
+        param_dtype: DTypeLike = jnp.bfloat16,
         qkv_bias: bool = False,
     ):
         mlp_hidden_dim = int(hidden_size * mlp_ratio)
@@ -339,7 +339,7 @@ class SingleStreamBlock(nnx.Module):
         hidden_size: int,
         num_heads: int,
         rngs: nnx.Rngs,
-        param_dtype: DTypeLike = jax.dtypes.bfloat16,
+        param_dtype: DTypeLike = jnp.bfloat16,
         mlp_ratio: float = 4.0,
         qk_scale: float | None = None,
     ):
@@ -403,7 +403,7 @@ class LastLayer(nnx.Module):
         patch_size: int,
         out_channels: int,
         rngs: nnx.Rngs,
-        param_dtype: DTypeLike = jax.dtypes.bfloat16,
+        param_dtype: DTypeLike = jnp.bfloat16,
     ):
         self.norm_final = nnx.LayerNorm(
             num_features=hidden_size,

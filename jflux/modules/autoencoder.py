@@ -32,7 +32,7 @@ class AttnBlock(nnx.Module):
         self,
         in_channels: int,
         rngs: nnx.Rngs,
-        param_dtype: DTypeLike = jax.dtypes.bfloat16,
+        param_dtype: DTypeLike = jnp.bfloat16,
     ) -> None:
         self.in_channels = in_channels
 
@@ -99,7 +99,7 @@ class ResnetBlock(nnx.Module):
         in_channels: int,
         out_channels: int,
         rngs: nnx.Rngs,
-        param_dtype: DTypeLike = jax.dtypes.bfloat16,
+        param_dtype: DTypeLike = jnp.bfloat16,
     ) -> None:
         self.in_channels = in_channels
         self.out_channels = in_channels if out_channels is None else out_channels
@@ -168,7 +168,7 @@ class Downsample(nnx.Module):
         self,
         in_channels: int,
         rngs: nnx.Rngs,
-        param_dtype: DTypeLike = jax.dtypes.bfloat16,
+        param_dtype: DTypeLike = jnp.bfloat16,
     ):
         self.conv = nnx.Conv(
             in_features=in_channels,
@@ -193,7 +193,7 @@ class Upsample(nnx.Module):
         self,
         in_channels: int,
         rngs: nnx.Rngs,
-        param_dtype: DTypeLike = jax.dtypes.bfloat16,
+        param_dtype: DTypeLike = jnp.bfloat16,
     ):
         self.conv = nnx.Conv(
             in_features=in_channels,
@@ -229,7 +229,7 @@ class Encoder(nnx.Module):
         num_res_blocks: int,
         z_channels: int,
         rngs: nnx.Rngs,
-        param_dtype: DTypeLike = jax.dtypes.bfloat16,
+        param_dtype: DTypeLike = jnp.bfloat16,
     ) -> None:
         self.ch = ch
         self.num_resolutions = len(ch_mult)
@@ -353,7 +353,7 @@ class Decoder(nnx.Module):
         resolution: int,
         z_channels: int,
         rngs: nnx.Rngs,
-        param_dtype: DTypeLike = jax.dtypes.bfloat16,
+        param_dtype: DTypeLike = jnp.bfloat16,
     ):
         self.ch = ch
         self.num_resolutions = len(ch_mult)

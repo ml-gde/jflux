@@ -186,7 +186,7 @@ def main(
             num_samples=1,
             height=opts.height,
             width=opts.width,
-            dtype=jax.dtypes.bfloat16,
+            dtype=jnp.bfloat16,
             seed=opts.seed,
         )
         opts.seed = None
