@@ -10,3 +10,5 @@ venv/
 .venv/
 
 **/.DS_Store
+
+uv.lock
