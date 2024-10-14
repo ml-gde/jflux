@@ -1,10 +1,11 @@
 import os
 from dataclasses import dataclass
 
+import jax
 import torch  # need for torch 2 jax
+from chex import Array
 from flax import nnx
 from huggingface_hub import hf_hub_download
-import jax
 from jax import numpy as jnp
 from safetensors import safe_open
 
@@ -14,10 +15,18 @@ from jflux.modules.conditioner import HFEmbedder
 from jflux.port import port_autoencoder, port_flux
 
 
-def torch2jax(torch_tensor):
-    intermediate_tensor = torch_tensor.to(torch.float32)
-    jax_tensor = jnp.array(intermediate_tensor, dtype=jnp.bfloat16)
-    return jax_tensor
+def torch2jax(torch_tensor: torch.Tensor) -> Array:
+    is_bfloat16 = torch_tensor.dtype == torch.bfloat16
+    if is_bfloat16:
+        # upcast the tensor to fp32
+        torch_tensor = torch_tensor.to(dtype=torch.float32)
+
+    if torch.device.type != "cpu":
+        torch_tensor = torch_tensor.to("cpu")
+
+    numpy_value = torch_tensor.numpy()
+    jax_array = jnp.array(numpy_value, dtype=jnp.bfloat16 if is_bfloat16 else None)
+    return jax_array
 
 
 @dataclass
@@ -118,67 +127,71 @@ def print_load_warning(missing: list[str], unexpected: list[str]) -> None:
         print(f"Got {len(unexpected)} unexpected keys:\n\t" + "\n\t".join(unexpected))
 
 
-def load_flow_model(name: str, hf_download: bool = True) -> Flux:
-    # Loading Flux
-    print("Init model")
-    ckpt_path = configs[name].ckpt_path
-    if (
-        ckpt_path is None
-        and configs[name].repo_id is not None
-        and configs[name].repo_flow is not None
-        and hf_download
-    ):
-        ckpt_path = hf_hub_download(configs[name].repo_id, configs[name].repo_flow)
+def load_flow_model(name: str, device: str, hf_download: bool = True) -> Flux:
+    device = jax.devices(device)[0]
+    with jax.default_device(device):
+        ckpt_path = configs[name].ckpt_path
+        if (
+            ckpt_path is None
+            and configs[name].repo_id is not None
+            and configs[name].repo_flow is not None
+            and hf_download
+        ):
+            ckpt_path = hf_hub_download(configs[name].repo_id, configs[name].repo_flow)
 
-    model = Flux(params=configs[name].params)
+        print(f"Load and port flux on {device}")
 
-    if ckpt_path is not None:
-        tensors = {}
-        with safe_open(ckpt_path, framework="pt") as f:
-            for k in f.keys():
-                with jax.default_device(jax.devices("cpu")[0]):
+        model = Flux(params=configs[name].params)
+        if ckpt_path is not None:
+            tensors = {}
+            with safe_open(ckpt_path, framework="pt") as f:
+                for k in f.keys():
                     tensors[k] = torch2jax(f.get_tensor(k))
 
-        model = port_flux(flux=model, tensors=tensors)
-        del tensors
+            model = port_flux(flux=model, tensors=tensors)
+
+            del tensors
+            jax.clear_caches()
     return model
 
 
-def load_t5() -> HFEmbedder:
+def load_t5(device: str | torch.device = "cuda", max_length: int = 512) -> HFEmbedder:
+    # max length 64, 128, 256 and 512 should work (if your sequence is short enough)
     return HFEmbedder(
-        "ariG23498/t5-v1-1-xxl-flax",
-        max_length=512,
-    )
+        "ariG23498/t5-v1_1-xxl-torch", max_length=max_length, torch_dtype=torch.bfloat16
+    ).to(device)
 
 
-def load_clip() -> HFEmbedder:
+def load_clip(device: str | torch.device = "cuda") -> HFEmbedder:
     return HFEmbedder(
-        "ariG23498/clip-vit-large-patch14-text-flax",
+        "ariG23498/clip-vit-large-patch14-torch",
         max_length=77,
-    )
+        torch_dtype=torch.bfloat16,
+    ).to(device)
 
 
-def load_ae(name: str, hf_download: bool = True) -> AutoEncoder:
-    ckpt_path = configs[name].ae_path
-    if (
-        ckpt_path is None
-        and configs[name].repo_id is not None
-        and configs[name].repo_ae is not None
-        and hf_download
-    ):
-        ckpt_path = hf_hub_download(configs[name].repo_id, configs[name].repo_ae)
+def load_ae(name: str, device: str, hf_download: bool = True) -> AutoEncoder:
+    device = jax.devices(device)[0]
+    with jax.default_device(device):
+        ckpt_path = configs[name].ae_path
+        if (
+            ckpt_path is None
+            and configs[name].repo_id is not None
+            and configs[name].repo_ae is not None
+            and hf_download
+        ):
+            ckpt_path = hf_hub_download(configs[name].repo_id, configs[name].repo_ae)
 
-    # Loading the autoencoder
-    print("Init AE")
-    ae = AutoEncoder(params=configs[name].ae_params)
+        print(f"Load and port autoencoder on {device}")
+        ae = AutoEncoder(params=configs[name].ae_params)
 
-    if ckpt_path is not None:
-        tensors = {}
-        with safe_open(ckpt_path, framework="pt") as f:
-            for k in f.keys():
-                with jax.default_device(jax.devices("cpu")[0]):
+        if ckpt_path is not None:
+            tensors = {}
+            with safe_open(ckpt_path, framework="pt") as f:
+                for k in f.keys():
                     tensors[k] = torch2jax(f.get_tensor(k))
+            ae = port_autoencoder(autoencoder=ae, tensors=tensors)
 
-        ae = port_autoencoder(autoencoder=ae, tensors=tensors)
-        del tensors
+            del tensors
+            jax.clear_caches()
     return ae

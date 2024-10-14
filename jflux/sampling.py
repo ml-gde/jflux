@@ -10,6 +10,7 @@ from jax.typing import DTypeLike
 
 from jflux.model import Flux
 from jflux.modules.conditioner import HFEmbedder
+from jflux.util import torch2jax
 
 
 def get_noise(
@@ -44,12 +45,15 @@ def prepare(
 
     if isinstance(prompt, str):
         prompt = [prompt]
-    txt = t5(prompt)
+
+    txt = torch2jax(t5(prompt))  # the ouput of t5 is torch tensor
+
     if txt.shape[0] == 1 and bs > 1:
         txt = repeat(txt, "1 ... -> bs ...", bs=bs)
     txt_ids = jnp.zeros((bs, txt.shape[1], 3))
 
-    vec = clip(prompt)
+    vec = torch2jax(clip(prompt))  # the output of clip is a torch tensor
+
     if vec.shape[0] == 1 and bs > 1:
         vec = repeat(vec, "1 ... -> bs ...", bs=bs)
 

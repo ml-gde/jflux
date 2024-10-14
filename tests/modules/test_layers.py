@@ -4,6 +4,7 @@ import jax.numpy as jnp
 import torch
 from einops import rearrange, repeat
 from flax import nnx
+from flax.nnx import RMSNorm as JaxRMSNorm
 from flux.modules.layers import DoubleStreamBlock as TorchDoubleStreamBlock
 from flux.modules.layers import MLPEmbedder as TorchMLPEmbedder
 from flux.modules.layers import Modulation as TorchModulation
@@ -17,7 +18,6 @@ from jflux.modules.layers import EmbedND as JaxEmbedND
 from jflux.modules.layers import MLPEmbedder as JaxMLPEmbedder
 from jflux.modules.layers import Modulation as JaxModulation
 from jflux.modules.layers import QKNorm as JaxQKNorm
-from jflux.modules.layers import RMSNorm as JaxRMSNorm
 from jflux.modules.layers import SelfAttention as JaxSelfAttention
 from jflux.modules.layers import timestep_embedding as jax_timestep_embedding
 from tests.utils import torch2jax
@@ -214,7 +214,7 @@ class LayersTestCase(chex.TestCase):
         param_dtype = jnp.float32
 
         torch_rms_norm = TorchRMSNorm(dim=dim)
-        jax_rms_norm = JaxRMSNorm(dim=dim, rngs=rngs, param_dtype=param_dtype)
+        jax_rms_norm = JaxRMSNorm(num_features=dim, rngs=rngs, param_dtype=param_dtype)
 
         # port the weights of the torch model into jax
         jax_rms_norm = port_rms_norm(

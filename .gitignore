@@ -7,9 +7,6 @@
 .ruff_cache/
 
 venv/
-data/
-models/
-notebooks/
+.venv/
 
 **/.DS_Store
-.venv
