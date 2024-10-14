@@ -138,7 +138,7 @@ def load_flow_model(name: str, device: str, hf_download: bool = True) -> Flux:
             and hf_download
         ):
             ckpt_path = hf_hub_download(configs[name].repo_id, configs[name].repo_flow)
-        
+
         print(f"Load and port flux on {device}")
 
         model = Flux(params=configs[name].params)
@@ -149,7 +149,7 @@ def load_flow_model(name: str, device: str, hf_download: bool = True) -> Flux:
                     tensors[k] = torch2jax(f.get_tensor(k))
 
             model = port_flux(flux=model, tensors=tensors)
-            
+
             del tensors
             jax.clear_caches()
     return model
@@ -191,7 +191,7 @@ def load_ae(name: str, device: str, hf_download: bool = True) -> AutoEncoder:
                 for k in f.keys():
                     tensors[k] = torch2jax(f.get_tensor(k))
             ae = port_autoencoder(autoencoder=ae, tensors=tensors)
-            
+
             del tensors
             jax.clear_caches()
     return ae

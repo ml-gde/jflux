@@ -46,13 +46,13 @@ def prepare(
     if isinstance(prompt, str):
         prompt = [prompt]
 
-    txt = torch2jax(t5(prompt)) # the ouput of t5 is torch tensor
+    txt = torch2jax(t5(prompt))  # the ouput of t5 is torch tensor
 
     if txt.shape[0] == 1 and bs > 1:
         txt = repeat(txt, "1 ... -> bs ...", bs=bs)
     txt_ids = jnp.zeros((bs, txt.shape[1], 3))
 
-    vec = torch2jax(clip(prompt)) # the output of clip is a torch tensor
+    vec = torch2jax(clip(prompt))  # the output of clip is a torch tensor
 
     if vec.shape[0] == 1 and bs > 1:
         vec = repeat(vec, "1 ... -> bs ...", bs=bs)
