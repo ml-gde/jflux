@@ -1,15 +1,10 @@
-from flax import nnx
-from chex import Array
-from transformers import (
-    FlaxCLIPTextModel,
-    CLIPTokenizer,
-    FlaxT5EncoderModel,
-    T5Tokenizer,
-)
+from torch import Tensor, nn
+from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 
 
-class HFEmbedder(nnx.Module):
+class HFEmbedder(nn.Module):
     def __init__(self, version: str, max_length: int, **hf_kwargs):
+        super().__init__()
         self.is_clip = version.split("/")[1].startswith("clip")
         self.max_length = max_length
         self.output_key = "pooler_output" if self.is_clip else "last_hidden_state"
@@ -18,18 +13,20 @@ class HFEmbedder(nnx.Module):
             self.tokenizer: CLIPTokenizer = CLIPTokenizer.from_pretrained(
                 version, max_length=max_length
             )
-            self.hf_module: FlaxCLIPTextModel = FlaxCLIPTextModel.from_pretrained(
+            self.hf_module: CLIPTextModel = CLIPTextModel.from_pretrained(
                 version, **hf_kwargs
             )
         else:
             self.tokenizer: T5Tokenizer = T5Tokenizer.from_pretrained(
                 version, max_length=max_length
             )
-            self.hf_module: FlaxT5EncoderModel = FlaxT5EncoderModel.from_pretrained(
+            self.hf_module: T5EncoderModel = T5EncoderModel.from_pretrained(
                 version, **hf_kwargs
             )
 
-    def __call__(self, text: list[str]) -> Array:
+        self.hf_module = self.hf_module.eval().requires_grad_(False)
+
+    def forward(self, text: list[str]) -> Tensor:
         batch_encoding = self.tokenizer(
             text,
             truncation=True,
@@ -37,13 +34,12 @@ class HFEmbedder(nnx.Module):
             return_length=False,
             return_overflowing_tokens=False,
             padding="max_length",
-            return_tensors="np",
+            return_tensors="pt",
         )
 
         outputs = self.hf_module(
-            input_ids=batch_encoding["input_ids"],
+            input_ids=batch_encoding["input_ids"].to(self.hf_module.device),
             attention_mask=None,
             output_hidden_states=False,
         )
-        outputs = outputs[self.output_key]
-        return outputs
+        return outputs[self.output_key]
