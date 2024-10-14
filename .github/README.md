@@ -35,6 +35,11 @@ To get started, follow these simple steps:
 > uv python install 3.10
 > uv python pin 3.10
 > ```
+>
+> If you don't have `uv` you can run the following command to get running
+> ```
+> cd jflux && pip install -U pip && pip install -e .
+> ```
 
 ## Usage
 
