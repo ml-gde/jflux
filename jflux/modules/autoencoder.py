@@ -236,7 +236,6 @@ class Encoder(nnx.Module):
         self.num_res_blocks = num_res_blocks
         self.resolution = resolution
         self.in_channels = in_channels
-        self.rngs = rngs
 
         # downsampling
         self.conv_in = nnx.Conv(
