@@ -225,7 +225,7 @@ def main(
             # move ae decoder to gpu
             ae_decoder_state = nnx.state(ae.decoder)
             ae_decoder_state = jax.device_put(ae_decoder_state, jax.devices("gpu")[0])
-            nnx.update(ae.deocder, ae_decoder_state)
+            nnx.update(ae.decoder, ae_decoder_state)
             jax.clear_caches()
 
 
