@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 import jax
 import torch  # need for torch 2 jax
+from chex import Array
 from flax import nnx
 from huggingface_hub import hf_hub_download
 from jax import numpy as jnp
@@ -14,10 +15,15 @@ from jflux.modules.conditioner import HFEmbedder
 from jflux.port import port_autoencoder, port_flux
 
 
-def torch2jax(torch_tensor):
-    intermediate_tensor = torch_tensor.to(torch.float32)
-    jax_tensor = jnp.array(intermediate_tensor, dtype=jnp.bfloat16)
-    return jax_tensor
+def torch2jax(torch_tensor: torch.Tensor) -> Array:
+    is_bfloat16 = torch_tensor.dtype == torch.bfloat16
+    if is_bfloat16:
+        # upcast the tensor to fp32
+        torch_tensor = torch_tensor.to(dtype=torch.float32)
+    
+    numpy_value = torch_tensor.nump()
+    jax_array = jnp.array(numpy_value, dtype=jnp.bfloat16 if is_bfloat16 else None)
+    return jax_array
 
 
 @dataclass
