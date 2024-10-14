@@ -13,13 +13,7 @@ from flax import nnx
 from PIL import Image
 
 from jflux.sampling import denoise, get_noise, get_schedule, prepare, unpack
-from jflux.util import configs, load_ae, load_clip, load_flow_model, load_t5
-
-
-def torch2jax(tensor):
-    tensor = tensor.float().numpy()
-    tensor = jnp.array(tensor, dtype=jnp.bfloat16)
-    return tensor
+from jflux.util import configs, load_ae, load_clip, load_flow_model, load_t5, torch2jax
 
 
 @dataclass
