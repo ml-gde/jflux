@@ -228,7 +228,6 @@ def main(
             nnx.update(ae.decoder, ae_decoder_state)
             jax.clear_caches()
 
-
         # decode latents to pixel space
         x = unpack(x=x.astype(jnp.float32), height=opts.height, width=opts.width)
         x = ae.decode(x)
