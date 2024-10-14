@@ -6,15 +6,8 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE.md" }
 dependencies = [
-    "einops>=0.8.0",
-    "fire>=0.6.0",
     "flax>=0.9.0",
-    # FIXME: Allow for local installation without GPUs as well `jax[cuda12]`
-    "jax>=0.4.31",
-    "mypy>=1.11.2",
-    "pillow>=10.4.0",
-    "ruff>=0.6.3",
-    "transformers>=4.44.2",
+    "jax[cuda]>=0.4.34",
 ]
 
 [project.scripts]

@@ -16,6 +16,8 @@ from PIL import Image
 from jflux.sampling import denoise, get_noise, get_schedule, prepare, unpack
 from jflux.util import configs, load_ae, load_clip, load_flow_model, load_t5, torch2jax
 
+import os
+os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 
 @dataclass
 class SamplingOptions:
@@ -103,7 +105,7 @@ def main(
     seed: int | None = None,
     prompt: str = (
         "a photo of a forest with mist swirling around the tree trunks. The word "
-        '"FLUX" is painted over it in big, red brush strokes with visible texture'
+        '"JFLUX" is painted over it in big, red brush strokes with visible texture'
     ),
     num_steps: int | None = None,
     loop: bool = False,
@@ -176,7 +178,7 @@ def main(
 
     while opts is not None:
         if opts.seed is None:
-            opts.seed = jax.random.PRNGKey(seed=42)
+            opts.seed = jax.random.PRNGKey(seed=102333)
         print(f"Generating with seed {opts.seed}:\n{opts.prompt}")
         t0 = time.perf_counter()
 
