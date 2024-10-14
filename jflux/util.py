@@ -163,7 +163,7 @@ def load_clip() -> HFEmbedder:
     )
 
 
-def load_ae(name: str, offload: bool, hf_download: bool = True) -> AutoEncoder:
+def load_ae(name: str, hf_download: bool = True) -> AutoEncoder:
     ckpt_path = configs[name].ae_path
     if (
         ckpt_path is None
@@ -177,18 +177,11 @@ def load_ae(name: str, offload: bool, hf_download: bool = True) -> AutoEncoder:
     print("Init AE")
     ae = AutoEncoder(params=configs[name].ae_params)
 
-    if offload:
-        jax_device = jax.devices("cpu")[0]
-    else:
-        jax_device = jax.devices()[0]
-
     if ckpt_path is not None:
         tensors = {}
         with safe_open(ckpt_path, framework="pt") as f:
             for k in f.keys():
-                with jax.default_device(jax_device):
-                    tensors[k] = torch2jax(f.get_tensor(k))
-
+                tensors[k] = torch2jax(f.get_tensor(k))
         ae = port_autoencoder(autoencoder=ae, tensors=tensors)
         del tensors
     return ae
