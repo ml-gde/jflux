@@ -21,7 +21,7 @@ def torch2jax(torch_tensor: torch.Tensor) -> Array:
         # upcast the tensor to fp32
         torch_tensor = torch_tensor.to(dtype=torch.float32)
 
-    numpy_value = torch_tensor.nump()
+    numpy_value = torch_tensor.numpy()
     jax_array = jnp.array(numpy_value, dtype=jnp.bfloat16 if is_bfloat16 else None)
     return jax_array
 
@@ -125,19 +125,19 @@ def print_load_warning(missing: list[str], unexpected: list[str]) -> None:
 
 
 def load_flow_model(name: str, device: str, hf_download: bool = True) -> Flux:
-    ckpt_path = configs[name].ckpt_path
-    if (
-        ckpt_path is None
-        and configs[name].repo_id is not None
-        and configs[name].repo_flow is not None
-        and hf_download
-    ):
-        ckpt_path = hf_hub_download(configs[name].repo_id, configs[name].repo_flow)
-
     device = jax.devices(device)[0]
-
-    print(f"Load and port flux on {device}")
     with jax.default_device(device):
+        ckpt_path = configs[name].ckpt_path
+        if (
+            ckpt_path is None
+            and configs[name].repo_id is not None
+            and configs[name].repo_flow is not None
+            and hf_download
+        ):
+            ckpt_path = hf_hub_download(configs[name].repo_id, configs[name].repo_flow)
+        
+        print(f"Load and port flux on {device}")
+
         model = Flux(params=configs[name].params)
         if ckpt_path is not None:
             tensors = {}
@@ -149,7 +149,6 @@ def load_flow_model(name: str, device: str, hf_download: bool = True) -> Flux:
             
             del tensors
             jax.clear_caches()
-        
     return model
 
 
@@ -169,19 +168,18 @@ def load_clip(device: str | torch.device = "cuda") -> HFEmbedder:
 
 
 def load_ae(name: str, device: str, hf_download: bool = True) -> AutoEncoder:
-    ckpt_path = configs[name].ae_path
-    if (
-        ckpt_path is None
-        and configs[name].repo_id is not None
-        and configs[name].repo_ae is not None
-        and hf_download
-    ):
-        ckpt_path = hf_hub_download(configs[name].repo_id, configs[name].repo_ae)
-
     device = jax.devices(device)[0]
-
-    print(f"Load and port autoencoder on {device}")
     with jax.default_device(device):
+        ckpt_path = configs[name].ae_path
+        if (
+            ckpt_path is None
+            and configs[name].repo_id is not None
+            and configs[name].repo_ae is not None
+            and hf_download
+        ):
+            ckpt_path = hf_hub_download(configs[name].repo_id, configs[name].repo_ae)
+
+        print(f"Load and port autoencoder on {device}")
         ae = AutoEncoder(params=configs[name].ae_params)
 
         if ckpt_path is not None:
