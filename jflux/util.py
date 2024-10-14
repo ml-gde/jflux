@@ -21,6 +21,9 @@ def torch2jax(torch_tensor: torch.Tensor) -> Array:
         # upcast the tensor to fp32
         torch_tensor = torch_tensor.to(dtype=torch.float32)
 
+    if torch.device.type != "cpu":
+        torch_tensor = torch_tensor.to("cpu")
+
     numpy_value = torch_tensor.numpy()
     jax_array = jnp.array(numpy_value, dtype=jnp.bfloat16 if is_bfloat16 else None)
     return jax_array
