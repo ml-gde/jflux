@@ -39,7 +39,7 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: uv pip install jax flax fire ruff pytest
+        run: uv pip install jax flax fire ruff pytest --system
 
       - name: Ruff
         run: |
