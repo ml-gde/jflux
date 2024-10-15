@@ -5,18 +5,17 @@ on:
     branches: [main]
     paths:
       - "**.py"
-      - ".devcontainer/requirements.txt"
       - ".github/workflows/python.yml"
   pull_request:
     branches: [main]
     paths:
       - "**.py"
-      - ".devcontainer/requirements.txt"
       - ".github/workflows/python.yml"
   release:
     types: [created]
   schedule:
     - cron: "0 0 * * 0"
+  workflow_dispatch:
 
 jobs:
   build:
@@ -24,27 +23,28 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12"]
         os: [ubuntu-latest, macos-latest]
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
         with:
-          enable-cache: true
-          cache-dependency-glob: "uv.lock"
-
-      - name: Set up Python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+          cache-dependency-path: "pyproject.toml"
 
       - name: Install dependencies
-        run: uv sync --all-extras --dev
-
-      - name: Ruff
         run: |
-          uv run ruff check jflux
+          pip install -U pip
+          pip install jax flax fire pytest ruff
+          pip install git+https://github.com/black-forest-labs/flux.git
+
+      - name: ruff
+        run: ruff check jflux
+      
       - name: Test with PyTest
         run: |
-          uv run pytest -v .
+          pytest -v -s .

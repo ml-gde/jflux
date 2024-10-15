@@ -1,7 +1,6 @@
 import math
 from dataclasses import dataclass
 
-import jax
 import jax.numpy as jnp
 from chex import Array
 from einops import rearrange
