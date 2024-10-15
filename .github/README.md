@@ -130,7 +130,7 @@ There are a few challenges we’re actively working to resolve. We encourage con
 - **High VRAM Requirements**: Running `flux-schnell` currently requires **40 GB of VRAM** (A100 or higher).
 - **Image Generation Time**: Image generation takes longer than expected, especially for high-resolution outputs (takes ~51s on an A100).
 - **bfloat16 Upcasting**: Weights are upcasted from bfloat16 to fp32 because **NumPy** does not handle bf16 natively, leading to some inefficiencies.
-- **porting weights**: As of now, we load pytorch weights and converted them to JAX tensors while inference, however it would be ideal if after the first run, we serialise the `nnx` weights to avoid redundant conversions in each run.
+- **porting weights**: Currently, we load pytorch weights and convert them to JAX tensors during inference; however, it would be ideal if, after the first run, we serialise the next weights to avoid redundant conversions in each run.
 - **pure JAX inference**: As of now, we load the `t5` and `clip` models as torch `Module` and wrap their outputs as JAX arrays. This prevents OOM while inference; having a pure JAX inference pipeline would be ideal.
 
 ## Roadmap
