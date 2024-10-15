@@ -39,7 +39,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -U pip
-          pip install jax flax fire
+          pip install jax flax fire pytest
           pip install git+https://github.com/black-forest-labs/flux.git
       - name: Test with PyTest
         run: |
