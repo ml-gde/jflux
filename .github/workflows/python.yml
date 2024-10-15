@@ -5,13 +5,11 @@ on:
     branches: [main]
     paths:
       - "**.py"
-      - ".devcontainer/requirements.txt"
       - ".github/workflows/python.yml"
   pull_request:
     branches: [main]
     paths:
       - "**.py"
-      - ".devcontainer/requirements.txt"
       - ".github/workflows/python.yml"
   release:
     types: [created]
@@ -24,7 +22,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12"]
         os: [ubuntu-latest, macos-latest]
 
     steps:
@@ -34,7 +32,7 @@ jobs:
         uses: astral-sh/setup-uv@v3
         with:
           enable-cache: true
-          cache-dependency-glob: "uv.lock"
+          cache-dependency-glob: "pyproject.toml"
 
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
@@ -47,4 +45,4 @@ jobs:
           uv run ruff check jflux
       - name: Test with PyTest
         run: |
-          uv run pytest -v .
+          uv run pytest -v -s .
