@@ -135,12 +135,12 @@ There are a few challenges we’re actively working to resolve. We encourage con
 
 ## Roadmap
 
-- [ ] Add TPU support
-- [ ] Optimize VRAM usage with gradient checkpointing
+- [ ] Add TPU support (https://github.com/ml-gde/jflux/issues/19)
+- [ ] Optimize VRAM usage with gradient checkpointing (https://github.com/ml-gde/jflux/issues/20)
 - [ ] Explore further optimizations for image generation time
 - [ ] Improve the handling of bfloat16 tensors with JAX
-- [ ] Serialise `nnx` weights during cli run
-- [ ] Port `t5` and `clip` models to `nnx.Module`
+- [ ] Serialise `nnx` weights during cli run (https://github.com/ml-gde/jflux/issues/22)
+- [ ] Port `t5` and `clip` models to `nnx.Module` (https://github.com/ml-gde/jflux/issues/21)
 
 ## Acknowledgements
 
