@@ -8,7 +8,19 @@ license = { file = "LICENSE.md" }
 dependencies = [
     "fire>=0.7.0",
     "flax>=0.9.0",
-    "jax[cuda]>=0.4.34",
+]
+
+[project.optional-dependencies]
+gpu = [
+  "jax[cuda]>=0.4.34",
+]
+tpu = [
+  "libtpu-nightly @ https://storage.googleapis.com/libtpu-nightly-releases/wheels/libtpu-nightly/libtpu_nightly-0.1.dev20241017+nightly-py3-none-any.whl",
+  "torch",
+  "torchvision",
+  "sentencepiece",
+  "transformers",
+  "einops"
 ]
 
 [project.scripts]

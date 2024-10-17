@@ -36,10 +36,20 @@ To get started, follow these simple steps:
 > uv python pin 3.10
 > ```
 >
-> If you don't have `uv` you can run the following command to get running
+> If you don't have `uv` you can run the following command to get running. 
+
+For GPU:
+
 > ```
-> cd jflux && pip install -U pip && pip install -e .
+> cd jflux && pip install -U pip && pip install -e .[gpu]
 > ```
+
+For TPU:
+
+> ```
+> cd jflux && pip install -U pip && pip install -e .[tpu]
+> ```
+
 
 ## Usage
 

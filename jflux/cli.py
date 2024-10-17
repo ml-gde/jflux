@@ -19,6 +19,23 @@ from jflux.util import configs, load_ae, load_clip, load_flow_model, load_t5
 
 os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 
+def get_device_type():
+  """Returns the type of JAX device being used.
+
+  Returns:
+    str: "gpu", "tpu", or "cpu"
+  """
+  try:
+    device_kind = jax.devices()[0].device_kind
+    if "gpu" in device_kind.lower():
+      return "gpu"
+    elif "tpu" in device_kind.lower():
+      return "tpu"
+    else:
+      return "cpu"
+  except IndexError:
+    return "cpu"  # No devices found, likely using CPU
+
 @dataclass
 class SamplingOptions:
     prompt: str
@@ -133,6 +150,9 @@ def main(
         guidance: guidance value used for guidance distillation
         add_sampling_metadata: Add the prompt to the image Exif metadata
     """
+    device_type = get_device_type()
+    print(f"Using {device_type} device")
+
     if name not in configs:
         available = ", ".join(configs.keys())
         raise ValueError(f"Got unknown model name: {name}, chose from {available}")
@@ -160,12 +180,12 @@ def main(
             idx = 0
 
     # init t5 and clip on the gpu (torch models)
-    t5 = load_t5(device="cuda", max_length=256 if name == "flux-schnell" else 512)
-    clip = load_clip(device="cuda")
+    t5 = load_t5(device="cuda" if device_type == "gpu" else "cpu", max_length=256 if name == "flux-schnell" else 512)
+    clip = load_clip(device="cuda" if device_type == "gpu" else "cpu")
 
     # init flux and ae on the cpu
-    model = load_flow_model(name, device="cpu" if offload else "gpu")
-    ae = load_ae(name, device="cpu" if offload else "gpu")
+    model = load_flow_model(name, device="cpu" if offload else device_type)
+    ae = load_ae(name, device="cpu" if offload else device_type)
 
     opts = SamplingOptions(
         prompt=prompt,
@@ -202,11 +222,12 @@ def main(
         if offload:
             # move t5 and clip to cpu
             t5, clip = t5.cpu(), clip.cpu()
-            torch.cuda.empty_cache()
+            if device_type == "gpu":
+              torch.cuda.empty_cache()
 
-            # load model to gpu
+            # load model to device
             model_state = nnx.state(model)
-            model_state = jax.device_put(model_state, jax.devices("gpu")[0])
+            model_state = jax.device_put(model_state, jax.devices(device_type)[0])
             nnx.update(model, model_state)
             jax.clear_caches()
 
@@ -226,7 +247,7 @@ def main(
 
             # move ae decoder to gpu
             ae_decoder_state = nnx.state(ae.decoder)
-            ae_decoder_state = jax.device_put(ae_decoder_state, jax.devices("gpu")[0])
+            ae_decoder_state = jax.device_put(ae_decoder_state, jax.devices(device_type)[0])
             nnx.update(ae.decoder, ae_decoder_state)
             jax.clear_caches()
 
