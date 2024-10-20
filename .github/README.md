@@ -145,7 +145,7 @@ There are a few challenges we’re actively working to resolve. We encourage con
 
 ## Roadmap
 
-- [ ] Add TPU support (https://github.com/ml-gde/jflux/issues/19)
+- [x] Add TPU support (https://github.com/ml-gde/jflux/issues/19) (fixed in https://github.com/ml-gde/jflux/pull/25)
 - [ ] Optimize VRAM usage with gradient checkpointing (https://github.com/ml-gde/jflux/issues/20)
 - [ ] Explore further optimizations for image generation time
 - [ ] Improve the handling of bfloat16 tensors with JAX

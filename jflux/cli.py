@@ -19,22 +19,24 @@ from jflux.util import configs, load_ae, load_clip, load_flow_model, load_t5
 
 os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 
-def get_device_type():
-  """Returns the type of JAX device being used.
 
-  Returns:
-    str: "gpu", "tpu", or "cpu"
-  """
-  try:
-    device_kind = jax.devices()[0].device_kind
-    if "gpu" in device_kind.lower():
-      return "gpu"
-    elif "tpu" in device_kind.lower():
-      return "tpu"
-    else:
-      return "cpu"
-  except IndexError:
-    return "cpu"  # No devices found, likely using CPU
+def get_device_type():
+    """Returns the type of JAX device being used.
+
+    Returns:
+      str: "gpu", "tpu", or "cpu"
+    """
+    try:
+        device_kind = jax.devices()[0].device_kind
+        if "gpu" in device_kind.lower():
+            return "gpu"
+        elif "tpu" in device_kind.lower():
+            return "tpu"
+        else:
+            return "cpu"
+    except IndexError:
+        return "cpu"  # No devices found, likely using CPU
+
 
 @dataclass
 class SamplingOptions:
@@ -180,7 +182,10 @@ def main(
             idx = 0
 
     # init t5 and clip on the gpu (torch models)
-    t5 = load_t5(device="cuda" if device_type == "gpu" else "cpu", max_length=256 if name == "flux-schnell" else 512)
+    t5 = load_t5(
+        device="cuda" if device_type == "gpu" else "cpu",
+        max_length=256 if name == "flux-schnell" else 512,
+    )
     clip = load_clip(device="cuda" if device_type == "gpu" else "cpu")
 
     # init flux and ae on the cpu
@@ -223,7 +228,7 @@ def main(
             # move t5 and clip to cpu
             t5, clip = t5.cpu(), clip.cpu()
             if device_type == "gpu":
-              torch.cuda.empty_cache()
+                torch.cuda.empty_cache()
 
             # load model to device
             model_state = nnx.state(model)
@@ -247,7 +252,9 @@ def main(
 
             # move ae decoder to gpu
             ae_decoder_state = nnx.state(ae.decoder)
-            ae_decoder_state = jax.device_put(ae_decoder_state, jax.devices(device_type)[0])
+            ae_decoder_state = jax.device_put(
+                ae_decoder_state, jax.devices(device_type)[0]
+            )
             nnx.update(ae.decoder, ae_decoder_state)
             jax.clear_caches()
 
