@@ -12,7 +12,7 @@ dependencies = [
 
 [project.optional-dependencies]
 gpu = [
-  "jax[cuda]>=0.4.34",
+  "jax[cuda]>=0.6.2",
 ]
 tpu = [
   "libtpu-nightly @ https://storage.googleapis.com/libtpu-nightly-releases/wheels/libtpu-nightly/libtpu_nightly-0.1.dev20241017+nightly-py3-none-any.whl",
