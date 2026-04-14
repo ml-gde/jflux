@@ -5,11 +5,13 @@ on:
     branches: [main]
     paths:
       - "**.py"
+      - "pyproject.toml"
       - ".github/workflows/python.yml"
   pull_request:
     branches: [main]
     paths:
       - "**.py"
+      - "pyproject.toml"
       - ".github/workflows/python.yml"
   release:
     types: [created]
